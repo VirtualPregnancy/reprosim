@@ -1,0 +1,26 @@
+Metadata-Version: 1.0
+Name: reprosim
+Version: -Reprosim-VERSION-
+Summary: Reprosim library of routines for modelling the reproductive system.
+Home-page: http://www.abi.auckland.ac.nz/en/about/our-research/development-and-reproductive-health.html
+Author: Reproduction and Development Group, Auckland Bioengineering Institute.
+Author-email: alys.clark@auckland.ac.nz
+License: http://www.apache.org/licenses/LICENSE-2.0
+Description:  Reprosim library - routines for modelling the reproductive system
+        
+        The Reprosim library is an advanced modelling library for models of the reproductive system.
+        
+Platform: any
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Education
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: Unix
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Topic :: Scientific/Engineering :: Medical Science Apps.
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
