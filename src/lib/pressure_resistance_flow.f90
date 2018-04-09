@@ -27,7 +27,7 @@ contains
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_PRQ" :: EVALUATE_PRQ
     use indices
     use arrays,only: dp,num_elems,num_nodes,elem_field,elem_nodes,elem_cnct,node_xyz
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     
     character(len=60), intent(in) :: mesh_type,bc_type
     real(dp), intent(in) :: inlet_flow
@@ -44,7 +44,7 @@ contains
     real(dp), allocatable :: RHS(:)
     integer :: num_vars,NonZeros,MatrixSize
     integer :: AllocateStatus
-    logical :: diagnostics_on
+    integer :: diagnostics_level
 
     real(dp), allocatable :: prq_solution(:),solver_solution(:)
     real(dp) :: viscosity,density,inletbc,outletbc,gamma,total_resistance
@@ -53,9 +53,9 @@ contains
     character(len=60) :: sub_name
     integer :: no,depvar,nz,ne,SOLVER_FLAG,ne0,ne1,nj,i
 
-	call get_diagnostics_on(diagnostics_on)
     sub_name = 'evaluate_prq'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
 !!---------DESCRIPTION OF MODEL Types -----------
 !mesh_type: can be simple_tree or full_plus_tube. Simple_tree can be airways, arteries, veins but no special features at the terminal level, the second one has arteries and veins connected by capillary units (capillaries are just tubes represented by an element)
 
@@ -76,7 +76,7 @@ elseif((bc_type.EQ.'flow').AND.(inlet_flow.EQ.0))then
 	call exit(1)
 endif
 
-if(diagnostics_on)then
+if(diagnostics_level.GT.1)then
 	print *, "mesh_type=",mesh_type
 	print *, "bc_type=",bc_type
 endif
@@ -88,7 +88,7 @@ elseif(bc_type.eq.'flow')then
     inletbc=inlet_flow
     outletbc=5.0_dp*133.0_dp!666.7_dp    
 endif
-if(diagnostics_on)then
+if(diagnostics_level.GT.1)then
 	print *, "inletbc=",inletbc
 	print *, "outletbc",outletbc
 endif
@@ -141,7 +141,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
         
 !! Calculate sparsity structure for solution matrices
     !Determine size of and allocate solution vectors/matrices
-    call calc_sparse_size(mesh_dof,num_vars,FIX,depvar_at_elem,MatrixSize,NonZeros)
+    call calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
 
  	allocate (SparseCol(NonZeros), STAT = AllocateStatus)    
     if (AllocateStatus /= 0) STOP "*** Not enough memory for SparseCol array ***"
@@ -160,7 +160,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
  
  !!! Initialise solution vector based on bcs and rigid vessel resistance
    call tree_resistance(total_resistance)
-   if(diagnostics_on)then
+   if(diagnostics_level.GT.1)then
      print *, "total_resistance=",total_resistance
    endif
    call initialise_solution(inletbc,outletbc,(inletbc-outletbc)/total_resistance, &
@@ -283,17 +283,18 @@ subroutine calculate_resistance(viscosity,mesh_type)
         elem_field
     use other_consts
     use indices
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     real(dp):: viscosity
 	character(len=60) :: mesh_type
 !local variables
     integer :: ne,np1,np2
     real(dp) :: resistance,zeta
     character(len=60) :: sub_name
-    logical :: diagnostics_on
+    integer :: diagnostics_level
 
   sub_name = 'calculate_resistance'
   call enter_exit(sub_name,1)
+  call get_diagnostics_level(diagnostics_level)
 
 !Loop over all elements in model and define resistance for that branch.
     do ne=1,num_elems
@@ -315,8 +316,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
        zeta = 1.0_dp!MAX(1.d0,dsqrt(2.d0*elem_field(ne_radius,ne)* &
             !reynolds/elem_field(ne_length,ne))*gamma)
        elem_field(ne_resist,ne) = resistance * zeta
-       call get_diagnostics_on(diagnostics_on)
-       if(diagnostics_on)then
+       if(diagnostics_level.GT.1)then
        		print *,"TESTING RESISTANCE: element",ne,"resistance",elem_field(ne_resist,ne),"radius",elem_field(ne_radius,ne)
        endif
     enddo 
@@ -331,7 +331,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
   subroutine calc_depvar_maps(mesh_from_depvar,depvar_at_elem,&
                 depvar_totals,depvar_at_node,mesh_dof,num_vars)
     use arrays,only: num_elems,num_nodes,elem_nodes
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     character(len=60) :: sub_name
 
      integer :: mesh_dof
@@ -343,11 +343,11 @@ subroutine calculate_resistance(viscosity,mesh_type)
 !     local variables
     integer :: ny_start=0  
     integer :: nc,ne,nn,np,nrc,ny
-    logical :: diagnostics_on
+    integer :: diagnostics_level
 
     sub_name = 'calc_depvar_maps'
     call enter_exit(sub_name,1)
-    call get_diagnostics_on(diagnostics_on)
+    call get_diagnostics_level(diagnostics_level)
      
      depvar_totals = 0
      mesh_from_depvar = 0
@@ -365,7 +365,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
           ! if(nrc.NE.0) ny=ny_start !--> resets to ny_start only for nrc=1,2. Maybe should also do for nrc=1??
            ny=ny_start 
            do ne=1,num_elems
-              if(diagnostics_on.AND.nc.NE.2.AND.nrc.NE.2) THEN
+              if((diagnostics_level.GT.1).AND.(nc.NE.2).AND.(nrc.NE.2)) THEN
               	print *,""
               	print *,"element ne",ne
               endif
@@ -391,7 +391,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
                     endif !nrc.NE.1
                  endif !depvar_at_node.EQ.0
                  
-                if(diagnostics_on.AND.nc.NE.2.AND.nrc.NE.2) THEN!arrays where nc=2 or nrc=2 don't seem to be used anywhere 
+                if((diagnostics_level.GT.1).AND.(nc.NE.2).AND.(nrc.NE.2)) THEN !arrays where nc=2 or nrc=2 don't seem to be used anywhere 
                 		print *,"depvar_at_node(",np,",",nrc,",",nc,")=", depvar_at_node(np,nrc,nc)
                 endif
               enddo !nn (np)
@@ -411,7 +411,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
                  mesh_from_depvar(2,ny,nrc)=ne
               endif
               
-              if(diagnostics_on.AND.nc.NE.2.AND.nrc.NE.2) THEN!arrays where nc=2 or nrc=2 don't seem to be used anywhere 
+              if((diagnostics_level.GT.1).AND.(nc.NE.2).AND.(nrc.NE.2)) THEN !arrays where nc=2 or nrc=2 don't seem to be used anywhere 
               	 print *,"depvar_at_elem(",nrc,",",nc,",",ne,")=", depvar_at_elem(nrc,nc,ne)
               endif                          
            enddo !noelem (ne)   
@@ -419,7 +419,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
         enddo !nc
      enddo !nrc
      num_vars=ny
-     if(diagnostics_on)then
+     if(diagnostics_level.GT.1)then
      	print *,"Max ny number (number of variables)=",ny     
 	 endif
     call enter_exit(sub_name,2)
@@ -501,13 +501,12 @@ subroutine initialise_solution(pressure_in,pressure_out,cardiac_output,mesh_dof,
 !
 !*calc_sparse_size:* Calculates sparsity sizes
 
-subroutine calc_sparse_size(mesh_dof,num_vars,FIX,depvar_at_elem,MatrixSize,NonZeros)
+subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
 
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     use arrays,only: num_elems,elem_nodes,num_nodes,elems_at_node
        
     integer, intent(in) :: mesh_dof
-    integer, intent(in) :: num_vars
     logical, intent(in) :: FIX(mesh_dof)
     integer,intent(in) :: depvar_at_elem(0:2,2,num_elems)
     integer,intent(inout) :: MatrixSize
@@ -515,11 +514,11 @@ subroutine calc_sparse_size(mesh_dof,num_vars,FIX,depvar_at_elem,MatrixSize,NonZ
 !local variables
     integer :: i,ne,np,fixed_variables, fixed_flows, fixed_pressures
     character(len=60) :: sub_name
-    logical :: diagnostics_on
+    integer :: diagnostics_level
     
     sub_name = 'calc_sparse_size'
     call enter_exit(sub_name,1)
-    call get_diagnostics_on(diagnostics_on)
+    call get_diagnostics_level(diagnostics_level)
 
  	fixed_variables = 0
  	!count fixed variables
@@ -528,7 +527,7 @@ subroutine calc_sparse_size(mesh_dof,num_vars,FIX,depvar_at_elem,MatrixSize,NonZ
  			fixed_variables = fixed_variables + 1
  		endif
  	enddo
- 	MatrixSize = num_vars - fixed_variables
+ 	MatrixSize = mesh_dof - fixed_variables
   	
  	!get count of fixed flows
  	fixed_flows = 0
@@ -550,7 +549,7 @@ subroutine calc_sparse_size(mesh_dof,num_vars,FIX,depvar_at_elem,MatrixSize,NonZ
  	enddo
  	NonZeros = NonZeros - fixed_flows
  	
- 	if(diagnostics_on)then
+ 	if(diagnostics_level.GT.1)then
  		print *,"MatrixSize",MatrixSize
  		print *,"NonZeros",NonZeros
  	endif
@@ -640,7 +639,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
 
     use indices
     use arrays,only: dp,num_elems,elem_nodes,num_nodes,elems_at_node,elem_cnct,elem_field
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
 
 	character(len=60),intent(in) :: bc_type
  	logical, intent(in) :: FIX(mesh_dof)
@@ -661,12 +660,14 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
     logical :: FlowBalancedNodes(num_nodes)
     logical :: NodePressureDone(num_nodes)
     logical :: ElementPressureEquationDone(num_elems)
-    logical :: elem_found,one_node_balanced,diagnostics_on
+    logical :: elem_found,one_node_balanced
     real(dp) :: flow_term
     character(len=60) :: sub_name
+    integer :: diagnostics_level
     
     sub_name = 'calc_sparse_1dtree'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
 	
 	!Initialise matrices and indices
     SparseCol=0
@@ -831,8 +832,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
 	  	endif	  
 	  endif
 	enddo !ne
-	call get_diagnostics_on(diagnostics_on)
-	if(diagnostics_on)then	    
+	if(diagnostics_level.GT.1)then    
     		print *,"MatrixSize=",MatrixSize
     		print *,"NonZeros=",NonZeros
     		do nzz=1,NonZeros

@@ -12,10 +12,10 @@
 module diagnostics
 
   implicit none
-  logical :: diagnostics_on
+  integer :: diagnostics_level ! level 0 - no diagnostics level 1 - only prints subroutine names, level 2 - prints sub names and contents of variables
 
   private
-  public enter_exit, get_diagnostics_on, set_diagnostics_on
+  public enter_exit, get_diagnostics_level, set_diagnostics_level
 
 contains
 
@@ -29,7 +29,9 @@ contains
     integer,intent(in) :: state
     character(len=MAX_SUBNAME_LEN), intent(in) :: sub_name
 
-    if(diagnostics_on)then
+	!print *,"diagnostics_level=",diagnostics_level
+
+    if(diagnostics_level.GE.1)then
       if(state.eq.1)then
         write(*,'('' Entering subroutine '',60A,'':'')') sub_name(1:MAX_SUBNAME_LEN)
       else
@@ -39,23 +41,29 @@ contains
 
   end subroutine enter_exit
 
-  subroutine set_diagnostics_on(state)
-  !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_SET_DIAGNOSTICS_ON":: SET_DIAGNOSTICS_ON
+!!!######################################################################
+
+  subroutine get_diagnostics_level(level)
     implicit none
 
-    logical, intent(in) :: state
+    integer :: level
 
-    diagnostics_on = state
+    level = diagnostics_level
 
-  end subroutine set_diagnostics_on
+  end subroutine get_diagnostics_level
 
-  subroutine get_diagnostics_on(state)
+!!!######################################################################
+
+  subroutine set_diagnostics_level(level)
+  !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_SET_DIAGNOSTICS_LEVEL":: SET_DIAGNOSTICS_LEVEL
     implicit none
 
-    logical :: state
+    integer, intent(in) :: level
 
-    state = diagnostics_on
+    diagnostics_level = level
 
-  end subroutine get_diagnostics_on
+
+  end subroutine set_diagnostics_level
+
 
 end module diagnostics

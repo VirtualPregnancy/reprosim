@@ -27,18 +27,19 @@ contains
   end subroutine enter_exit_c
 
   !!!######################################################################
-  subroutine set_diagnostics_on_c(state) bind(C, name="set_diagnostics_on_c")
-    use diagnostics, only: set_diagnostics_on
+  subroutine set_diagnostics_level_c(level) bind(C, name="set_diagnostics_level_c")
+    use diagnostics, only: set_diagnostics_level
     implicit none
 
-    logical, intent(in) :: state
+    integer, intent(in) :: level
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_set_diagnostics_on(state)
+    call so_set_diagnostics_level(level)
 #else
-    call set_diagnostics_on(state)
+    call set_diagnostics_level(level)
 #endif
 
-  end subroutine set_diagnostics_on_c
+  end subroutine set_diagnostics_level_c
+
 
 end module diagnostics_c

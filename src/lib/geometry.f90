@@ -41,7 +41,7 @@ contains
          num_nodes,num_units,units,num_arterial_elems
     use indices
     use other_consts,only: PI
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
     !Parameters to become inputs
     real(dp) :: offset(3)
@@ -52,11 +52,11 @@ contains
     integer :: nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter
     integer, allocatable :: np_map(:)
     character(len=60) :: sub_name
-    logical :: diagnostics_on
+    integer :: diagnostics_level
 
     sub_name = 'add_matching_mesh'
     call enter_exit(sub_name,1)
-    call get_diagnostics_on(diagnostics_on)
+    call get_diagnostics_level(diagnostics_level)
     !Ultimately offset should be an input argument
     offset(1)=0.0_dp
     offset(2)=1e-6_dp
@@ -73,7 +73,7 @@ contains
     elseif(mesh_type.eq.'terminal')then
       num_elems_new = 2*num_elems + num_units
     endif
-    if(diagnostics_on)then
+    if(diagnostics_level.GT.1)then
     		print *,"mesh_type",mesh_type
     	endif
     call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
@@ -174,19 +174,19 @@ contains
          elem_ordrs(nindex,ne1)=elem_ordrs(nindex,ne_m)
          elem_field(ne_group,ne1)=1.0_dp!connection between meshes
        enddo
-       if(diagnostics_on)then
+       if(diagnostics_level.GT.1)then
        	 print *, 'Number of connections', cap_term
        endif
      endif
     num_nodes=num_nodes_new
     num_arterial_elems = num_elems
     num_elems=num_elems_new
-    if(diagnostics_on)then
+    if(diagnostics_level.GT.1)then
       print *, "num_nodes=",num_nodes
       print *, "num_arterial_elems=",num_arterial_elems
       print *, "num_elems=",num_elems
     endif
-    if(diagnostics_on)then 
+    if(diagnostics_level.GT.1)then 
    	 	!print out new node geometry, number of connected elements for each element and element connectivity array
    		print *,"element nodes:"
    		DO ne=1,num_elems
@@ -230,7 +230,7 @@ contains
        	    		ENDDO
        		ENDIF    
     		ENDDO    
-    endif !diagnostics_on
+    endif !diagnostics_level
        
     deallocate(np_map)
     call enter_exit(sub_name,2)
@@ -245,16 +245,16 @@ contains
     use arrays,only: dp, elem_cnct,elem_symmetry,elem_units_below,&
          num_elems,num_units,units,unit_field
     use indices,only: num_nu
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
 
     integer :: ne,ne0,nu
     character(len=60) :: sub_name
-    logical :: diagnostics_on
+    integer:: diagnostics_level
 
     sub_name = 'append_units'
     call enter_exit(sub_name,1)
-    call get_diagnostics_on(diagnostics_on)
+    call get_diagnostics_level(diagnostics_level)
 
     num_units = 0
     DO ne=1,num_elems
@@ -263,7 +263,7 @@ contains
        ENDIF
     ENDDO
     
-    if(diagnostics_on)then
+    if(diagnostics_level.GT.1)then
 		print *,"num_units=",num_units
 	endif
 
@@ -294,7 +294,7 @@ contains
             + elem_units_below(ne)*elem_symmetry(ne)
     enddo !ne
 	
-	if(diagnostics_on)then
+	if(diagnostics_level.GT.1)then
 		do ne=1,num_elems
 			print *,"elem_units_below(",ne,")",elem_units_below(ne)
 		enddo
@@ -315,7 +315,7 @@ contains
          elem_ordrs,elem_symmetry,elems_at_node,elem_units_below,&
          node_xyz,num_elems,num_nodes
     use indices
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
 
     character(len=MAX_FILENAME_LEN), intent(in) :: ELEMFILE
@@ -325,11 +325,11 @@ contains
     character(LEN=132) :: ctemp1
     character(LEN=40) :: sub_string
     character(len=60) :: sub_name
-    logical :: diagnostics_on
+    integer :: diagnostics_level
 
     sub_name = 'define_1d_elements'
     call enter_exit(sub_name,1)
-    call get_diagnostics_on(diagnostics_on)
+    call get_diagnostics_level(diagnostics_level)
 
     open(10, file=ELEMFILE, status='old')
 
@@ -337,7 +337,7 @@ contains
        read(unit=10, fmt="(a)", iostat=ierror) ctemp1
        if(index(ctemp1, "elements")> 0) then
           call get_final_integer(ctemp1,num_elems)
-          if(diagnostics_on)then
+          if(diagnostics_level.GT.1)then
           	print *, "num_elems", num_elems
           endif
           exit read_number_of_elements
@@ -392,7 +392,7 @@ contains
                    read (sub_string(ibeg:iend-1), '(i7)' ) np_global
                    call get_local_node(np_global,np) ! get local node np for global node
                    elem_nodes(nn,ne)=np ! the local node number, not global
-                   if(diagnostics_on)then
+                   if(diagnostics_level.GT.1)then
                    		print *,"elem_nodes(nn,ne)", nn, ne, "= np", np
                    endif
                    sub_string = adjustl(sub_string(iend:i_ss_end)) ! get chars beyond blank, remove leading blanks
@@ -435,7 +435,7 @@ contains
 
   !*define_node_geometry:* Reads in an ipnode file to define a tree geometry
     use arrays,only: dp,nodes,node_field,node_xyz,num_nodes
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     use indices
     use other_consts, only: MAX_FILENAME_LEN
     implicit none
@@ -445,13 +445,14 @@ contains
     integer :: i,ierror,np,np_global,&
          num_versions,nv,NJT
     character(LEN=132) :: ctemp1
-    LOGICAL :: versions,diagnostics_on
+    LOGICAL :: versions
     real(dp) :: point
     character(len=60) :: sub_name
+    integer :: diagnostics_level
   
     sub_name = 'define_node_geometry'
     call enter_exit(sub_name,1)
-    call get_diagnostics_on(diagnostics_on)
+    call get_diagnostics_level(diagnostics_level)
 
     versions = .TRUE.
     NJT = 0
@@ -464,7 +465,7 @@ contains
        read(unit=10, fmt="(a)", iostat=ierror) ctemp1 !read a line into ctemp1
        if(index(ctemp1, "nodes")> 0) then !keyword "nodes" is found in ctemp1
           call get_final_integer(ctemp1,num_nodes) !return the final integer
-          if(diagnostics_on)then
+          if(diagnostics_level.GT.1)then
        	  	print *, "num_nodes",num_nodes
        	  endif
           exit read_number_of_nodes !exit the named do loop
@@ -535,7 +536,7 @@ contains
                 call get_final_real(ctemp1,point)
              endif
              node_xyz(i,np)=point
-             if(diagnostics_on)then
+             if(diagnostics_level.GT.1)then
              	print *, "node_xyz(i,np)",i," ",np,"=", point
              endif
           end do !i
@@ -558,7 +559,7 @@ contains
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_RAD_FROM_GEOM" :: DEFINE_RAD_FROM_GEOM
     use arrays,only: dp,num_elems,elem_field,elem_ordrs,maxgen,elem_cnct,num_arterial_elems
     use indices
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
    character(LEN=100), intent(in) :: ORDER_SYSTEM,START_FROM
    character(LEN=100), optional :: group_type_in, group_option_in
@@ -571,11 +572,11 @@ contains
       inlet_count
    real(dp) :: radius
    character(len=60) :: sub_name
-   logical :: diagnostics_on
+   integer :: diagnostics_level
 
    sub_name = 'define_rad_from_geom'
     call enter_exit(sub_name,1)
-    call get_diagnostics_on(diagnostics_on)
+    call get_diagnostics_level(diagnostics_level)
     !define list of elements you are going to operate on
     if(present(group_type_in))then
       group_type = group_type_in
@@ -597,8 +598,8 @@ contains
       read (START_FROM,'(I10)') ne_min
       read (group_option_in,'(I10)') ne_max
     endif
-    if(diagnostics_on)then
-    	  print *,"ne_min", ne_min, "ne_max",ne_max
+    if(diagnostics_level.GT.1)then
+    	  print *,"ne_min=", ne_min, "ne_max=",ne_max
     	endif
     !Define start element
     if(group_type.ne.'venous')then
@@ -617,8 +618,8 @@ contains
        		read (START_FROM,'(I10)') ne_start
     		endif
 	endif
-	if(diagnostics_on)then
-		print *, "ne_start",ne_start
+	if(diagnostics_level.GT.1)then
+		print *, "ne_start=",ne_start
 	endif
 
     !Strahler and Horsfield ordering system
@@ -628,15 +629,15 @@ contains
       nindex = no_hord !for Horsfield ordering
     endif
 
-	if(diagnostics_on)then
-		print *, "ordering system: ",ORDER_SYSTEM(1:5)
+	if(diagnostics_level.GT.1)then
+		print *, "ordering system= ",ORDER_SYSTEM(1:5)
 	endif
 
     ne=ne_start
     n_max_ord=elem_ordrs(nindex,ne)
     elem_field(ne_radius,ne)=START_RAD
 
-	if(diagnostics_on)then
+	if(diagnostics_level.GT.1)then
 		print *, "start radius START_RAD = ",START_RAD
 	endif
 
@@ -646,7 +647,7 @@ contains
      elem_field(ne_radius,ne)=radius  
      elem_field(ne_radius_in,ne)=radius
      elem_field(ne_radius_out,ne)=radius
-     if(diagnostics_on)then
+     if(diagnostics_level.GT.1)then
      	print *,"radius for element",ne,"=",elem_field(ne_radius,ne)
      	print *,"radius in for element",ne,"=",elem_field(ne_radius_in,ne)
      	print *,"radius out for element",ne,"=",elem_field(ne_radius_out,ne)
@@ -663,18 +664,18 @@ contains
   subroutine element_connectivity_1d()
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ELEMENT_CONNECTIVITY_1D" :: ELEMENT_CONNECTIVITY_1D
     use arrays,only: elem_cnct,elem_nodes,elems_at_node,num_elems,num_nodes
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
     !     Local Variables
     integer :: ne,ne2,nn,noelem,np,np2,np1,counter,orphan_counter
     integer,parameter :: NNT=2
     character(len=60) :: sub_name
     integer :: orphan_nodes(num_nodes)
-    logical :: diagnostics_on
+    integer :: diagnostics_level
 
     sub_name = 'element_connectivity_1d'
     call enter_exit(sub_name,1)
-    call get_diagnostics_on(diagnostics_on)
+    call get_diagnostics_level(diagnostics_level)
 
     elem_cnct = 0 !initialise
 
@@ -691,7 +692,7 @@ contains
         ENDDO !nn
     ENDDO !noelem
     
-    if(diagnostics_on)then
+    if(diagnostics_level.GT.1)then
     		DO nn=1,num_nodes
        		print *," "
        		print *,"node",nn
@@ -745,7 +746,7 @@ contains
 	! upstream elements elem_cnct(-1,counter,ne)
 	! total count of downstream elements connected to element ne elem_cnct(1,0,ne)
 	! downstream elements elem_cnct(1,counter,ne)
-	if(diagnostics_on)then
+	if(diagnostics_level.GT.1)then
    		DO ne=1,num_elems
    	    		print *,""
    	    		print *,"element",ne 
@@ -776,16 +777,19 @@ contains
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_ORDERING" :: EVALUATE_ORDERING
     use arrays,only: elem_cnct,elem_nodes,elem_ordrs,elem_symmetry,&
          elems_at_node,num_elems,num_nodes,maxgen
-    use diagnostics, only: enter_exit,get_diagnostics_on
+    use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
 
     integer :: INLETS,ne,ne0,ne2,noelem2,np,np2, &
          num_attach,n_children,n_generation, &
          n_horsfield,OUTLETS,STRAHLER,STRAHLER_ADD,temp1
-    LOGICAL :: DISCONNECT,DUPLICATE,diagnostics_on
+    LOGICAL :: DISCONNECT,DUPLICATE
     character(len=60) :: sub_name
-    sub_name = 'evaluate_ordering'
+    integer :: diagnostics_level
+    
+    sub_name = 'evaluate_ordering'    
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
 
     !Calculate generations, Horsfield orders, Strahler orders
     !.....Calculate branch generations
@@ -805,7 +809,7 @@ contains
        ENDIF
        maxgen=max(maxgen,elem_ordrs(1,ne))
     ENDDO !noelem
-	if(diagnostics_on)then
+	if(diagnostics_level.GT.1)then
 		print *,"branch generations - maxgen",maxgen
 	endif
 
