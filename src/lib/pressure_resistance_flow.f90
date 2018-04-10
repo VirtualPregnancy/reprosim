@@ -154,9 +154,9 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
     allocate (solver_solution(MatrixSize), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory for solver_solution array ***"
     !calculate the sparsity structure
-    call calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem, &
+	call calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem, &
         depvar_at_node,NonZeros,MatrixSize,SparseCol,SparseRow,SparseVal,RHS, &
-        prq_solution)
+        prq_solution)    
  
  !!! Initialise solution vector based on bcs and rigid vessel resistance
    call tree_resistance(total_resistance)
@@ -793,7 +793,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
  		  endif !flow at node np is unbalanced
  		enddo !nn
 	  	
-	  	!if flow balancing hasn't been done for any node for element ne try to do pressure equation for the element
+	  	!if flow balancing hasn't been done for any node for element ne and pressure equation hasn't already been done, do the pressure equation for the element
 	  	if((.NOT.one_node_balanced).AND.(.NOT.ElementPressureEquationDone(ne)))then
 	  	
   	  		!do the pressure equation for element ne
@@ -850,8 +850,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
     endif
     call enter_exit(sub_name,2)
   end subroutine calc_sparse_1dtree
-!
-!##################################################################
+
 
 end module pressure_resistance_flow
 
