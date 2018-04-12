@@ -94,7 +94,7 @@ contains
        elems_at_node(np,0)=0 !initialise
      !Doesnt map versions, would be added here
     enddo
-
+    
     do noelem=1,num_elems
         ne=ne_global+noelem
         elem_field(ne_group,ne)=2.0_dp!VEIN
@@ -117,10 +117,12 @@ contains
           elem_nodes(2,ne)=np_map(elem_nodes(1,ne_m))
           elem_cnct(-1,0,ne)=elem_cnct(1,0,ne_m)
           elem_cnct(1,0,ne)=elem_cnct(-1,0,ne_m)
-          do n=1,elem_cnct(1,0,ne)
+          !do n=1,elem_cnct(1,0,ne)
+          do n=1,elem_cnct(-1,0,ne)        
             elem_cnct(-1,n,ne)=elem_cnct(1,n,ne_m)+ne0
           enddo
-          do n=1,elem_cnct(-1,0,ne)
+          !do n=1,elem_cnct(-1,0,ne)
+          do n=1,elem_cnct(1,0,ne)
             elem_cnct(1,n,ne)=elem_cnct(-1,n,ne_m)+ne0
           enddo
         endif
@@ -181,12 +183,11 @@ contains
     num_nodes=num_nodes_new
     num_arterial_elems = num_elems
     num_elems=num_elems_new
-    if(diagnostics_level.GT.1)then
-      print *, "num_nodes=",num_nodes
-      print *, "num_arterial_elems=",num_arterial_elems
-      print *, "num_elems=",num_elems
-    endif
+    
     if(diagnostics_level.GT.1)then 
+        print *, "num_nodes=",num_nodes
+        print *, "num_arterial_elems=",num_arterial_elems
+        print *, "num_elems=",num_elems
    	 	!print out new node geometry, number of connected elements for each element and element connectivity array
    		print *,"element nodes:"
    		DO ne=1,num_elems
@@ -727,12 +728,12 @@ contains
        IF(NNT == 2) THEN !1d
           np1=elem_nodes(1,ne) !first local node
           np2=elem_nodes(2,ne) !second local node
-     
+
           DO noelem=1,elems_at_node(np2,0) !for each element connected to node np2
              ne2=elems_at_node(np2,noelem) !get the element number connected to node np2
              IF(ne2 /= ne)THEN !if element connected to node np2 is not the current element ne
                 elem_cnct(-1,0,ne2)=elem_cnct(-1,0,ne2)+1
-                elem_cnct(-1,elem_cnct(-1,0,ne2),ne2)=ne !previous element               
+                elem_cnct(-1,elem_cnct(-1,0,ne2),ne2)=ne !previous element              
                 elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1
                 elem_cnct(1,elem_cnct(1,0,ne),ne)=ne2
              ENDIF !ne2
