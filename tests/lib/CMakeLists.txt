@@ -4,6 +4,10 @@
 # These are all .pf files.
 set(DIAGNOSTICS_TEST_SRCS
     test_diagnostics.pf)
+set(GEOMETRY_TEST_SRCS
+    test_define_node_geometry.pf)
+set(GEOMETRY_TEST_SRCS
+    test_define_1d_elements.pf)
 
 # Make use of the pFUnit helper function to create a test.
 # Arguments    : - test_package_name: Name of the test package
@@ -11,5 +15,7 @@ set(DIAGNOSTICS_TEST_SRCS
 #                - extra_sources    : List of extra Fortran source code used for testing (if none, input empty string "")
 #                - extra_sources_c  : List of extra C/C++ source code used for testing (if none, input empty string "")
 add_pfunit_test(diagnostics_test ${DIAGNOSTICS_TEST_SRCS} "" "")
+add_pfunit_test(geometry_test ${GEOMETRY_TEST_SRCS} "" "")
 # Link the test to the reprosim library target.
 target_link_libraries (diagnostics_test reprosim)
+target_link_libraries (geometry_test reprosim)

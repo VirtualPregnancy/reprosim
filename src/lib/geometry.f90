@@ -390,7 +390,7 @@ contains
                    iend=index(sub_string," ") !get location of first blank in sub-string
                    read (sub_string(ibeg:iend-1), '(i7)' ) np_global
                    call get_local_node(np_global,np) ! get local node np for global node
-                   elem_nodes(nn,ne)=np ! the local node number, not global
+                   elem_nodes(nn,ne)=np ! the local node number, not global             
                    if(diagnostics_level.GT.1)then
                    		print *,"elem_nodes(nn,ne)", nn, ne, "= np", np
                    endif
@@ -413,10 +413,10 @@ contains
        elem_field(ne_length,ne) = DSQRT((node_xyz(1,np2) - &
             node_xyz(1,np1))**2 + (node_xyz(2,np2) - &
             node_xyz(2,np1))**2 + (node_xyz(3,np2) - &
-            node_xyz(3,np1))**2)
+            node_xyz(3,np1))**2)   
        do j=1,3
           elem_direction(j,ne) = (node_xyz(j,np2) - &
-               node_xyz(j,np1))/elem_field(ne_length,ne)       
+               node_xyz(j,np1))/elem_field(ne_length,ne)           
        enddo !j
     enddo
 
@@ -452,6 +452,7 @@ contains
     sub_name = 'define_node_geometry'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
+   
 
     versions = .TRUE.
     NJT = 0
@@ -681,7 +682,7 @@ contains
     ! calculate elems_at_node array: stores the elements that nodes are in
     ! elems_at_node(node np,0)= total number of elements connected to this node
     ! elems_at_node(node np, index of each connected element starting at 1) = connected element
-    elems_at_node(1:num_nodes,0) = 0 !initialise number of adjacent elements
+    elems_at_node = 0 !initialise
 
     DO ne=1,num_elems
        DO nn=1,2
@@ -701,6 +702,7 @@ contains
        		ENDDO
     		ENDDO
     endif
+    
     !check for nodes with 0 elements - exit if any are found
     orphan_counter = 0
     DO nn=1,num_nodes
@@ -793,6 +795,7 @@ contains
     !Calculate generations, Horsfield orders, Strahler orders
     !.....Calculate branch generations
 
+	elem_ordrs = 0
     maxgen=1
     DO ne=1,num_elems
        ne0=elem_cnct(-1,1,ne) !parent
@@ -869,7 +872,7 @@ contains
           WRITE(*,*) ' Node ',np,' attached to',num_attach,' elements'
        ENDIF
     ENDDO
-
+ print *, elem_symmetry   
     call enter_exit(sub_name,2)
 
   end subroutine evaluate_ordering
@@ -1064,19 +1067,20 @@ contains
     integer :: np
     logical :: found
 
-    np=1
+    np=1   
     found=.false.
-    do while (.not.found)
+    do while ((.not.found).AND.(np.le.num_nodes))
        if(nodes(np).eq.np_global)then
           found=.true.
-       elseif(np.gt.num_nodes)then
-          found = .true.
-          write(*,'('' Global node '',I6,'' not in node list'')') np_global
-          read(*,*)
        else
           np=np+1
        endif
     enddo
+
+    if(.not.found)then
+       np = 0          
+       write(*,'('' Global node '',I6,'' not in node list'')') np_global
+    endif
 
     np_local = np
     return
