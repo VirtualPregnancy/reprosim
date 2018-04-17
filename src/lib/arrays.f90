@@ -1,14 +1,7 @@
 module arrays
-!*Brief Description:* This module defines arrays.
-!
-!*LICENSE:*
-!
+!*Description:* This module defines arrays.
 !
 !*Contributor(s):* Merryn Tawhai, Alys Clark
-!
-!*Full Description:*
-!
-!This module defines arrays
 
   implicit none
 
@@ -41,15 +34,16 @@ module arrays
     elems_at_node, elem_symmetry, elem_units_below, maxgen, num_arterial_elems
 
 contains
-  subroutine set_node_field_value(row, col, value)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SET_NODE_FIELD_VALUE" :: SET_NODE_FIELD_VALUE
+  subroutine set_node_field_value(row, col, value)  
+  !this subroutine sets the value of a node field
     implicit none
-
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SET_NODE_FIELD_VALUE" :: SET_NODE_FIELD_VALUE
     integer, intent(in) :: row, col
     real(dp), intent(in) :: value
+    
 
     node_field(row, col) = value
-
+	
   end subroutine set_node_field_value
 
 
