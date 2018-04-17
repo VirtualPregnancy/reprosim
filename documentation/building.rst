@@ -114,7 +114,7 @@ Targets
 Below is a list of the more important targets that can be built.  Each target can be built either from the command line on make based scripts or through a project for IDE build scripts.
 
 reprosim
-------
+--------
 
 The *reprosim* target builds the reprosim fortran libary.
 

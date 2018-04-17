@@ -1,13 +1,6 @@
 module geometry
-!*Brief Description:* This module handles all geometry read/write/generation.
+!*Description:* This module handles all geometry read/write/generation.
 !
-!*LICENSE:*
-!
-!
-!
-!*Full Description:*
-!
-!This module handles all geometry read/write/generation.
   use other_consts
   implicit none
 
@@ -32,9 +25,8 @@ contains
 !
 !###################################################################################
 !
-!*add_matching_mesh:*
   subroutine add_matching_mesh()
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ADD_MATCHING_MESH" :: ADD_MATCHING_MESH
+  !*Description:* adds a matching venous mesh to an arterial mesh
     use arrays,only: dp,elems,elem_cnct,elem_direction,elem_field,&
          elem_nodes,elem_ordrs,elem_symmetry,elems_at_node,&
          nodes,node_xyz,num_elems,&
@@ -43,6 +35,7 @@ contains
     use other_consts,only: PI
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ADD_MATCHING_MESH" :: ADD_MATCHING_MESH  
     !Parameters to become inputs
     real(dp) :: offset(3)
     logical :: REVERSE=.TRUE.
@@ -238,14 +231,14 @@ contains
 !
 !###################################################################################
 !
-!*append_units:* Appends terminal units at the end of a tree structure
   subroutine append_units()
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_APPEND_UNITS" :: APPEND_UNITS
+  !*Description:* Appends terminal units at the end of a tree structure
     use arrays,only: dp, elem_cnct,elem_symmetry,elem_units_below,&
          num_elems,num_units,units,unit_field
     use indices,only: num_nu
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_APPEND_UNITS" :: APPEND_UNITS
 
     integer :: ne,ne0,nu
     character(len=60) :: sub_name
@@ -306,16 +299,15 @@ contains
 !
 !###################################################################################
 !
-  !*define_1d_elements:* Reads in an element ipelem file to define a geometry
   subroutine define_1d_elements(ELEMFILE)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_1D_ELEMENTS" :: DEFINE_1D_ELEMENTS
-
+  !*Description:* Reads in an element ipelem file to define a geometry
     use arrays,only: dp, elem_direction,elem_field,elems,elem_cnct,elem_nodes,&
          elem_ordrs,elem_symmetry,elems_at_node,elem_units_below,&
          node_xyz,num_elems,num_nodes
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_1D_ELEMENTS" :: DEFINE_1D_ELEMENTS
 
     character(len=MAX_FILENAME_LEN), intent(in) :: ELEMFILE
     !     Local Variables
@@ -430,14 +422,13 @@ contains
 !###################################################################################
 !
   subroutine define_node_geometry(NODEFILE)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_NODE_GEOMETRY" :: DEFINE_NODE_GEOMETRY
-
-  !*define_node_geometry:* Reads in an ipnode file to define a tree geometry
+  !*Description:* Reads in an ipnode file to define a tree geometry
     use arrays,only: dp,nodes,node_field,node_xyz,num_nodes
     use diagnostics, only: enter_exit,get_diagnostics_level
     use indices
     use other_consts, only: MAX_FILENAME_LEN
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_NODE_GEOMETRY" :: DEFINE_NODE_GEOMETRY
 
     character(len=MAX_FILENAME_LEN), intent(in) :: NODEFILE !Input nodefile
     !     Local Variables
@@ -554,13 +545,14 @@ contains
 !
 !###################################################################################
 !
-!*define_rad_from_geom:* Defines vessel or airway radius based on their geometric structure
   subroutine define_rad_from_geom(ORDER_SYSTEM, CONTROL_PARAM, START_FROM, START_RAD, group_type_in, group_option_in)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_RAD_FROM_GEOM" :: DEFINE_RAD_FROM_GEOM
+  !*Description:* Defines vessel radius based on their geometric structure
     use arrays,only: dp,num_elems,elem_field,elem_ordrs,maxgen,elem_cnct,num_arterial_elems
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_RAD_FROM_GEOM" :: DEFINE_RAD_FROM_GEOM
+    
    character(LEN=100), intent(in) :: ORDER_SYSTEM,START_FROM
    character(LEN=100), optional :: group_type_in, group_option_in
    real(dp), intent(in) :: CONTROL_PARAM,START_RAD
@@ -660,12 +652,13 @@ contains
 !
 !###########################################################################
 !
-!*element_connectivity_1d:*  Calculates element connectivity in 1D and stores in elelem_cnct
   subroutine element_connectivity_1d()
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ELEMENT_CONNECTIVITY_1D" :: ELEMENT_CONNECTIVITY_1D
+  !*Description:* Calculates element connectivity in 1D and stores in elelem_cnct
     use arrays,only: elem_cnct,elem_nodes,elems_at_node,num_elems,num_nodes
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ELEMENT_CONNECTIVITY_1D" :: ELEMENT_CONNECTIVITY_1D
+  
     !     Local Variables
     integer :: ne,ne2,nn,noelem,np,np2,np1,counter,orphan_counter
     integer,parameter :: NNT=2
@@ -773,13 +766,14 @@ contains
 !
 !###################################################################################
 !
-!*evaluate_ordering:* calculates generations, Horsfield orders, Strahler orders for a given tree
   subroutine evaluate_ordering()
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_ORDERING" :: EVALUATE_ORDERING
+  !*Description:* calculates generations, Horsfield orders, Strahler orders for a given tree
+   
     use arrays,only: elem_cnct,elem_nodes,elem_ordrs,elem_symmetry,&
          elems_at_node,num_elems,num_nodes,maxgen
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_ORDERING" :: EVALUATE_ORDERING
 
     integer :: INLETS,ne,ne0,ne2,noelem2,np,np2, &
          num_attach,n_children,n_generation, &
@@ -872,15 +866,16 @@ contains
           WRITE(*,*) ' Node ',np,' attached to',num_attach,' elements'
        ENDIF
     ENDDO
- print *, elem_symmetry   
+  
     call enter_exit(sub_name,2)
 
   end subroutine evaluate_ordering
 !
 !###################################################################################
 !
-!*reallocate_node_elem_arrays:* Reallocates the size of arrays when modifying geometries
   subroutine reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
+  !*Description:* Reallocates the size of arrays when modifying geometries
+  
     use arrays,only: dp,elems,elem_cnct,elem_direction,elem_field,&
          elem_ordrs,elem_nodes,&
          elem_symmetry,elem_units_below,elems_at_node,&
@@ -998,7 +993,6 @@ contains
 !
 !###################################################################################
 !
-!>get_final_real
   subroutine get_final_real(string,rtemp)
     use arrays,only: dp
     implicit none
@@ -1027,7 +1021,6 @@ contains
 !
 !###################################################################################
 !
-!*get_final_string*
   subroutine get_final_string(string,rtemp)
     use arrays,only: dp
     implicit none
@@ -1056,7 +1049,6 @@ contains
 !
 !###################################################################################
 !
-!*get_local_node*
   subroutine get_local_node(np_global,np_local)
     use arrays,only: nodes,num_nodes
     implicit none
@@ -1090,7 +1082,6 @@ contains
 !
 !###################################################################################
 !
-!*get_final_integer*
   subroutine get_final_integer(string,num)
     implicit none
     character,intent(in) :: string*(132)

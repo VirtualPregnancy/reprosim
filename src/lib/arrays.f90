@@ -35,7 +35,7 @@ module arrays
 
 contains
   subroutine set_node_field_value(row, col, value)  
-  !this subroutine sets the value of a node field
+  !*Description:* This subroutine sets the value of a node field
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SET_NODE_FIELD_VALUE" :: SET_NODE_FIELD_VALUE
     integer, intent(in) :: row, col

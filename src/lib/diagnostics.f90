@@ -1,15 +1,7 @@
-!> \file
-!> \author Merryn Tawhai
-!> \brief This module handles diagnostics.
-!>
-!> \section LICENSE
-!>
-!>
-!> Contributor(s):
-!>
-!>\Description
-!> This module handles diagnostics
 module diagnostics
+!*Description:* This module handles diagnostics. There are 3 diagnostic levels available: level 0 - no diagnostics; level 1- prints subroutine names; and level 2- prints subroutine names as well as variables that each subroutine calculates.
+!
+!*Contributor(s):* Merryn Tawhai, Monika Byrne
 
   implicit none
   integer :: diagnostics_level ! level 0 - no diagnostics level 1 - only prints subroutine names, level 2 - prints sub names and contents of variables
@@ -22,10 +14,10 @@ contains
 !!!######################################################################
 
   subroutine enter_exit(sub_name, state)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ENTER_EXIT" :: ENTER_EXIT
+  !*Description:* Prints the subroutine name
     use other_consts, only: MAX_SUBNAME_LEN
     implicit none
-
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ENTER_EXIT" :: ENTER_EXIT
     integer,intent(in) :: state
     character(len=MAX_SUBNAME_LEN), intent(in) :: sub_name
 
@@ -44,6 +36,7 @@ contains
 !!!######################################################################
 
   subroutine get_diagnostics_level(level)
+
     implicit none
 
     integer :: level
@@ -55,9 +48,9 @@ contains
 !!!######################################################################
 
   subroutine set_diagnostics_level(level)
-  !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_SET_DIAGNOSTICS_LEVEL":: SET_DIAGNOSTICS_LEVEL
+  
     implicit none
-
+  !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_SET_DIAGNOSTICS_LEVEL":: SET_DIAGNOSTICS_LEVEL
     integer, intent(in) :: level
 
     diagnostics_level = level
