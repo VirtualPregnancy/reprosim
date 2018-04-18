@@ -5,31 +5,38 @@
       use geometry,only: define_node_geometry	
       use other_consts, only: MAX_FILENAME_LEN
       use indices
-      use test_data,only:write_node_file,set_node_xyz,set_nodes
+      use test_data,only:write_node_file,delete_node_file,get_dim_node_xyz,&
+           set_node_xyz,get_dim_nodes,set_nodes
       implicit none
       
       character(len=MAX_FILENAME_LEN) :: NODEFILE
       real(dp), allocatable :: test_node_xyz(:,:)
       integer, allocatable :: test_nodes(:)
-      integer :: AllocateStatus
+      integer :: AllocateStatus,x,y
 
       NODEFILE = "test.ipnode"
       call write_node_file(NODEFILE)
 
-      allocate (test_node_xyz(3,4), STAT = AllocateStatus)
+
+      call get_dim_node_xyz(x,y)
+      allocate (test_node_xyz(x,y), STAT = AllocateStatus)
       if (AllocateStatus /= 0) STOP "*** Not enough memory for mesh_from_depvar array ***"
 
       call set_node_xyz(test_node_xyz)
 
-!      #call set_nodes(test_nodes)
+	  call get_dim_nodes(x)
+      allocate (test_nodes(x), STAT = AllocateStatus)
+      if (AllocateStatus /= 0) STOP "*** Not enough memory for mesh_from_depvar array ***"	  
+
+      call set_nodes(test_nodes)
 
       call define_node_geometry(NODEFILE)
 
-      @assertEqual(5, num_nodes)
+      @assertEqual(4, num_nodes)
       @assertEqual(test_node_xyz,node_xyz)
-!      !@assertEqual(test_nodes, nodes)
+      @assertEqual(test_nodes, nodes)
 
-     ! call delete_node_file(NODEFILE) 
+      call delete_node_file(NODEFILE) 
 
    end subroutine test_define_node_geometry
 

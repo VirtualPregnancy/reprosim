@@ -7,7 +7,8 @@ module test_data
   implicit none
 
   private
-  public write_node_file, delete_node_file, set_nodes, set_node_xyz
+  public write_node_file, delete_node_file, get_dim_nodes, set_nodes, &
+         get_dim_node_xyz, set_node_xyz
 
 contains
   subroutine write_node_file(NODEFILE)  
@@ -71,6 +72,11 @@ contains
     close(10, status="delete")     
   end subroutine delete_node_file
   
+  subroutine get_dim_nodes(x)
+    integer,intent(out) :: x
+    x = 4
+  end subroutine get_dim_nodes
+  
   subroutine set_nodes(nodes)
   
     integer, intent(inout) :: nodes(4)
@@ -82,6 +88,11 @@ contains
   
   end subroutine set_nodes
   
+  subroutine get_dim_node_xyz(x,y)
+    integer,intent(out) :: x,y
+    x = 3
+    y = 4
+  end subroutine get_dim_node_xyz
   
   subroutine set_node_xyz(node_xyz)
    use arrays, only:dp
