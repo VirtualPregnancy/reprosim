@@ -684,7 +684,7 @@ contains
           elems_at_node(np,elems_at_node(np,0))=ne ! local element that np is in
         ENDDO !nn
     ENDDO !noelem
-    
+
     if(diagnostics_level.GT.1)then
     		DO nn=1,num_nodes
        		print *," "

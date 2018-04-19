@@ -2,12 +2,13 @@
 # Add all the files that make a single test, we could have multiple files testing
 # the same module.  Don't add test files into the same test that test different modules.
 # These are all .pf files.
+
 set(DIAGNOSTICS_TEST_SRCS
     test_diagnostics.pf)
-set(GEOMETRY_TEST_SRCS
-    test_define_node_geometry.pf
-    #test_define_1d_elements.pf
-    )
+set(GEOMETRY_TEST_SRCS 
+    test_define_node_geometry.pf 
+    test_define_1d_elements.pf     
+)
 # Make use of the pFUnit helper function to create a test.
 # Arguments    : - test_package_name: Name of the test package
 #                - test_sources     : List of pf-files to be compiled
