@@ -14,8 +14,8 @@ set(GEOMETRY_TEST_SRCS
 #                - test_sources     : List of pf-files to be compiled
 #                - extra_sources    : List of extra Fortran source code used for testing (if none, input empty string "")
 #                - extra_sources_c  : List of extra C/C++ source code used for testing (if none, input empty string "")
-add_pfunit_test(diagnostics_test ${DIAGNOSTICS_TEST_SRCS} "" "")
-add_pfunit_test(geometry_test ${GEOMETRY_TEST_SRCS} "" "")
+add_pfunit_test(diagnostics_test "${DIAGNOSTICS_TEST_SRCS}" "" "")
+add_pfunit_test(geometry_test "${GEOMETRY_TEST_SRCS}" "" "")
 # Link the test to the reprosim library target.
 target_link_libraries (diagnostics_test test_utils)
 target_link_libraries (geometry_test test_utils)
