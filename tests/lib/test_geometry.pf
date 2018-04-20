@@ -137,3 +137,45 @@
       call delete_elem_file(ELEMFILE)     
 
    end subroutine test_define_1d_elements
+   
+   
+@Test
+
+   subroutine test_append_units
+      use pfunit_mod
+      use arrays,only: num_units,units,elem_units_below
+      use indices,only: num_nu
+      use geometry, only:append_units
+      use test_data,only: get_num_units, get_dim_units,get_units, &
+                     get_dim_elem_units_below,get_elem_units_below
+      implicit none
+
+      integer :: test_num_units,x,AllocateStatus
+      integer, allocatable :: test_units(:)
+      integer, allocatable :: test_elem_units_below(:)
+      
+      call append_units()
+    
+      !populate test variables - variables populated by sub append_units
+      call get_num_units(test_num_units)
+      @assertEqual(test_num_units, num_units)
+            
+      call  get_dim_units(x)
+      allocate (test_units(x), STAT = AllocateStatus)
+      if(AllocateStatus /= 0)then
+         @assertEqual("*** Not enough memory for test_units array ***","")
+      endif    
+      call get_units(test_units)
+      @assertEqual(test_units,units)
+      deallocate(test_units)
+      
+      call  get_dim_elem_units_below(x)
+      allocate (test_elem_units_below(1:x), STAT = AllocateStatus)
+      if(AllocateStatus /= 0)then
+         @assertEqual("*** Not enough memory for test_elem_units_below array ***","")
+      endif    
+      call get_elem_units_below(test_elem_units_below)
+      @assertEqual(test_elem_units_below,elem_units_below)
+      deallocate(test_elem_units_below)
+        
+   end subroutine test_append_units

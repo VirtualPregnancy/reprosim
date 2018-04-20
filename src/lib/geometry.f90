@@ -291,7 +291,7 @@ contains
 			print *,"elem_units_below(",ne,")",elem_units_below(ne)
 		enddo
 	endif
-	
+
     call enter_exit(sub_name,2)
 
   end subroutine append_units

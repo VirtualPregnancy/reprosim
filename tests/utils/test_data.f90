@@ -12,7 +12,8 @@ module test_data
          get_num_elems, get_dim_elem_nodes,get_elem_nodes,get_dim_elems_at_node, &
          get_elems_at_node,get_dim_elem_cnct,get_elem_cnct,get_dim_elem_field, &
          get_elem_field,get_dim_elem_direction,get_elem_direction, &
-         get_dim_elem_ordrs,get_elem_ordrs,get_maxgen
+         get_dim_elem_ordrs,get_elem_ordrs,get_maxgen,get_num_units, &
+         get_dim_units,get_units,get_dim_elem_units_below,get_elem_units_below
            
 contains
   subroutine write_node_file(NODEFILE)  
@@ -268,5 +269,33 @@ contains
     integer,intent(out) :: maxgen
     maxgen = 2
   end subroutine get_maxgen
+  
+  subroutine get_num_units(num_units)
+    integer,intent(out) :: num_units
+    num_units = 2
+  end subroutine get_num_units
+   
+  subroutine get_dim_units(x)
+    integer,intent(out) :: x
+    call get_num_units(x)  
+  end subroutine get_dim_units
+  
+  subroutine get_units(units)
+    integer,intent(out) :: units(2)
+    units(1)=2
+    units(2)=3
+  end subroutine get_units
+       
+  subroutine get_dim_elem_units_below(x)
+    integer,intent(out) :: x
+    call get_num_elems(x)
+  end subroutine get_dim_elem_units_below
+  
+  subroutine get_elem_units_below(elem_units_below)
+    integer,intent(out) :: elem_units_below(1:3) ! 1:num_elems
+    elem_units_below(1) = 2 
+    elem_units_below(2) = 1 
+    elem_units_below(3) = 1
+  end subroutine get_elem_units_below
   
 end module test_data

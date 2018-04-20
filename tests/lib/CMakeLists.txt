@@ -6,7 +6,7 @@
 set(DIAGNOSTICS_TEST_SRCS
     test_diagnostics.pf)
 set(GEOMETRY_TEST_SRCS 
-    test_geometry1.pf
+    test_geometry.pf
 )
 #test_define_1d_elements.pf 
 #test_define_node_geometry.pf
