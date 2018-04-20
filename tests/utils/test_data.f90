@@ -12,7 +12,7 @@ module test_data
          get_num_elems, get_dim_elem_nodes,get_elem_nodes,get_dim_elems_at_node, &
          get_elems_at_node,get_dim_elem_cnct,get_elem_cnct,get_dim_elem_field, &
          get_elem_field,get_dim_elem_direction,get_elem_direction, &
-         get_dim_elem_ordrs,get_elem_ordrs
+         get_dim_elem_ordrs,get_elem_ordrs,get_maxgen
            
 contains
   subroutine write_node_file(NODEFILE)  
@@ -263,5 +263,10 @@ contains
     elem_ordrs(2,3) = 1
     elem_ordrs(3,3) = 1 
   end subroutine get_elem_ordrs
+  
+  subroutine get_maxgen(maxgen)
+    integer,intent(out) :: maxgen
+    maxgen = 2
+  end subroutine get_maxgen
   
 end module test_data

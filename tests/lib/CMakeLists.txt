@@ -6,9 +6,10 @@
 set(DIAGNOSTICS_TEST_SRCS
     test_diagnostics.pf)
 set(GEOMETRY_TEST_SRCS 
-    test_define_node_geometry.pf 
-    test_define_1d_elements.pf     
+    test_geometry1.pf
 )
+#test_define_1d_elements.pf 
+#test_define_node_geometry.pf
 # Make use of the pFUnit helper function to create a test.
 # Arguments    : - test_package_name: Name of the test package
 #                - test_sources     : List of pf-files to be compiled
