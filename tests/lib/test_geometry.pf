@@ -196,7 +196,7 @@
       endif    
       call get_units(test_units)
       print *,"test units", test_units
-      print *,"units" units
+      print *,"units", units
       @assertEqual(test_units,units)
       
       
