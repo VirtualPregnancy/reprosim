@@ -26,18 +26,25 @@
       @assertEqual(test_num_nodes, num_nodes)
        
 	  call get_dim_nodes(x)
+	  print *,"dim nodes",x
       allocate (test_nodes(x), STAT = AllocateStatus)
       if (AllocateStatus /= 0) STOP "*** Not enough memory for test_nodes array ***"
       call get_nodes(test_nodes)
+      print *,"test_nodes",test_nodes
+      print *,"nodes",nodes
       @assertEqual(test_nodes, nodes)
-      deallocate(test_nodes)
-
+      
       call get_dim_node_xyz(x,y)
+      print *,"dim node_xyz",x,y
       allocate (test_node_xyz(x,y), STAT = AllocateStatus)
       if (AllocateStatus /= 0) STOP "*** Not enough memory for test_node_xyz array ***"
-      call get_node_xyz(test_node_xyz)     
+      call get_node_xyz(test_node_xyz)  
+      print *, "test_node_xyz",test_node_xyz
+      print *, "node_xyz",node_xyz 
       @assertEqual(test_node_xyz,node_xyz)
-      deallocate(test_node_xyz)
+      
+      !deallocate(test_nodes)
+      !deallocate(test_node_xyz)
 
       call delete_node_file(NODEFILE) 
 
@@ -78,64 +85,83 @@
       @assertEqual(test_num_elems, num_elems)
       
       call  get_dim_elem_nodes(x)
+      print *,"dim elem_nodes",x
       allocate (test_elem_nodes(2,x), STAT = AllocateStatus)
       if(AllocateStatus /= 0)then
          @assertEqual("*** Not enough memory for test_elem_nodes array ***","")
       endif    
       call get_elem_nodes(test_elem_nodes)
+      print *,"test_elem_nodes",test_elem_nodes
+      print *,"elem_nodes",elem_nodes
       @assertEqual(test_elem_nodes,elem_nodes)
-      deallocate(test_elem_nodes)
-      
+          
       tree_type = "arterial"
       call get_dim_elems_at_node(tree_type,x)
+      print *,"dim elems_at_node",x
       allocate (test_elems_at_node(x,0:3), STAT = AllocateStatus)
       if(AllocateStatus /= 0)then
          @assertEqual("*** Not enough memory for test_elems_at_node array ***","")
       endif   
-      call get_elems_at_node(test_elems_at_node)   
+      call get_elems_at_node(test_elems_at_node)
+      print *,"test_elems_at_node",test_elems_at_node   
+      print *,"elems_at_node",elems_at_node 
       @assertEqual(test_elems_at_node,elems_at_node)
-      deallocate(test_elems_at_node)   
-
+      
       call get_dim_elem_cnct(x)
+      print *,"dim elem_cnct",x
       allocate (test_elem_cnct(-1:1,0:2,0:x), STAT = AllocateStatus)
       if(AllocateStatus /= 0)then 
          @assertEqual("*** Not enough memory for test_elem_cnct array ***","")
       endif  
       call get_elem_cnct(test_elem_cnct)  
+      print *,"test_elem_cnct",test_elem_cnct
+      print *,"elem_cnct",elem_cnct
       @assertEqual(test_elem_cnct,elem_cnct)
-      deallocate(test_elem_cnct)
             
       call get_dim_elem_field(x)
+      print *, "dim_elem_field",x
       allocate (test_elem_field(num_ne,x), STAT = AllocateStatus)
       if(AllocateStatus /= 0)then
           @assertEqual("*** Not enough memory for test_elem_field array ***","")
       endif
       call get_elem_field(test_elem_field)  
+      print *,"test_elem_field",test_elem_field
+      print *,"elem_field",elem_field
       @assertEqual(test_elem_field,elem_field)
-      deallocate(test_elem_field)
 
       call get_dim_elem_direction(x)
+      print *,"dim elem_direction",x
       allocate (test_elem_direction(3,x), STAT = AllocateStatus)
       if(AllocateStatus /= 0)then
         @assertEqual("*** Not enough memory for test_elem_direction array ***","")
       endif   
       call get_elem_direction(test_elem_direction) 
+      print *,"test_elem_direction",test_elem_direction
+      print *,"elem_direction",elem_direction
       @assertEqual(test_elem_direction,elem_direction)
-      deallocate(test_elem_direction) 
             
       call get_dim_elem_ordrs(x)
+      print *,"dim elem_ordrs",x
       allocate (test_elem_ordrs(num_ord,x), STAT = AllocateStatus)
       if(AllocateStatus /= 0)then
          @assertEqual("*** Not enough memory for test_elem_ordrs array ***","")
       endif    
       call get_elem_ordrs(test_elem_ordrs)  
+      print *,"test_elem_ordrs",test_elem_ordrs
+      print *,"elem_ordrs",elem_ordrs
       @assertEqual(test_elem_ordrs,elem_ordrs)
-      deallocate(test_elem_ordrs)
       
       call get_maxgen(test_maxgen)
       @assertEqual(test_maxgen,maxgen)
 
-      call delete_elem_file(ELEMFILE)     
+      call delete_elem_file(ELEMFILE)
+      
+      !deallocate(test_elem_nodes)    
+      !deallocate(test_elems_at_node)   
+      !deallocate(test_elem_cnct) 
+      !deallocate(test_elem_field)
+      !deallocate(test_elem_direction) 
+      !deallocate(test_elem_ordrs)
 
    end subroutine test_define_1d_elements
    
@@ -159,27 +185,34 @@
     
       !populate test variables - variables populated by sub append_units
       call get_num_units(test_num_units)
+      print *,"test_num_units",test_num_units
       @assertEqual(test_num_units, num_units)
             
       call  get_dim_units(x)
+      print *,"dim units", x
       allocate (test_units(x), STAT = AllocateStatus)
       if(AllocateStatus /= 0)then
          @assertEqual("*** Not enough memory for test_units array ***","")
       endif    
       call get_units(test_units)
+      print *,"test units", test_units
+      print *,"units" units
       @assertEqual(test_units,units)
-      deallocate(test_units)
+      
       
       call  get_dim_elem_units_below(x)
+      print *,"dim elem_units_below",x
       allocate (test_elem_units_below(1:x), STAT = AllocateStatus)
       if(AllocateStatus /= 0)then
          @assertEqual("*** Not enough memory for test_elem_units_below array ***","")
       endif
       call get_elem_units_below(test_elem_units_below)
-      !print *, test_elem_units_below
-      !print *, elem_units_below
+      print *, "test_elem_units_below", test_elem_units_below
+      print *, "elem_units_below", elem_units_below
       @assertEqual(test_elem_units_below,elem_units_below)
-      deallocate(test_elem_units_below)
+            
+      !deallocate(test_units)
+      !deallocate(test_elem_units_below)
         
    end subroutine test_append_units
    
