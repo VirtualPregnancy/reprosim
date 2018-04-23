@@ -73,9 +73,14 @@ contains
     close(10, status="delete")     
   end subroutine delete_node_file
   
-  subroutine get_num_nodes(num_nodes)
+  subroutine get_num_nodes(tree_type,num_nodes)
+    character(len=20),intent(in) :: tree_type
     integer,intent(out) :: num_nodes
-    num_nodes = 4
+    if(tree_type.EQ."arterial")then
+      num_nodes = 4
+    elseif(tree_type.EQ."arterial_and_venous")then
+      num_nodes = 8
+    endif
   end subroutine get_num_nodes  
   
   subroutine get_dim_nodes(x)
@@ -175,9 +180,10 @@ contains
      elem_nodes(2,3)=4
   end subroutine get_elem_nodes
   
-  subroutine get_dim_elems_at_node(x)
+  subroutine get_dim_elems_at_node(tree_type,x)
+     character(len=20),intent(in) :: tree_type
      integer,intent(out) :: x
-     call get_num_nodes(x)
+     call get_num_nodes(tree_type,x)
   end subroutine get_dim_elems_at_node
   
   subroutine get_elems_at_node(elems_at_node)
