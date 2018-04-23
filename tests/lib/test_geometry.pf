@@ -152,10 +152,11 @@
       @assertEqual(test_elem_ordrs,elem_ordrs)
       
       call get_maxgen(test_maxgen)
+      print *,"test_maxgen",test_maxgen
       @assertEqual(test_maxgen,maxgen)
 
       call delete_elem_file(ELEMFILE)
-      
+      print *, "file deleted"
       !deallocate(test_elem_nodes)    
       !deallocate(test_elems_at_node)   
       !deallocate(test_elem_cnct) 
@@ -181,6 +182,7 @@
       integer, allocatable :: test_units(:)
       integer, allocatable :: test_elem_units_below(:)
       
+      print *, "about to call append units"
       call append_units()
     
       !populate test variables - variables populated by sub append_units
