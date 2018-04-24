@@ -221,7 +221,15 @@ contains
           			print *, "downstream element",elem_cnct(1,counter,ne)
        	    		ENDDO
        		ENDIF    
-    		ENDDO    
+    		ENDDO   
+    		
+    		DO ne=1,num_elems
+    			do counter=1,3		
+    		  		print *, "elem_ordrs(",counter,",",ne,")=",elem_ordrs(counter,ne)
+    			ENDDO
+    		enddo
+    		print *, elem_ordrs
+    		 
     endif !diagnostics_level
        
     deallocate(np_map)

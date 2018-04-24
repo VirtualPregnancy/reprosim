@@ -226,7 +226,7 @@ contains
   subroutine get_elem_field(elem_field)
     use indices, only: ne_length,num_ne
     use arrays, only:dp
-    real(dp),intent(out) :: elem_field(num_ne,3) ! array size: num_ne, num_elems
+    real(dp),intent(inout) :: elem_field(num_ne,3) ! array size: num_ne, num_elems
     elem_field = 0.0_dp
     elem_field(ne_length,1) = 100.0_dp
     elem_field(ne_length,2) = 70.710678118654755_dp
