@@ -128,19 +128,13 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
     call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
       depvar_at_node,depvar_at_elem,prq_solution,mesh_dof,mesh_type)
    
-    !second call if simple tree need to define pressure bcs at all terminal branches
-    if(mesh_type.eq.'simple_tree')then
-        ADD=.TRUE.
-        call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
+    !second call to define pressure bcs at terminal branches 
+     ADD=.TRUE.
+     call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
             depvar_at_node,depvar_at_elem,prq_solution,mesh_dof,mesh_type)
-	elseif(mesh_type.eq.'full_plus_tube')then
-		ADD=.TRUE.
-		call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
-		     depvar_at_node,depvar_at_elem,prq_solution,mesh_dof,mesh_type)
-    endif
 
 !! Calculate resistance of each element
-   call calculate_resistance(viscosity,mesh_type)
+    call calculate_resistance(viscosity,mesh_type)
         
 !! Calculate sparsity structure for solution matrices
     !Determine size of and allocate solution vectors/matrices
@@ -259,7 +253,7 @@ depvar_at_elem,prq_solution,mesh_dof,mesh_type)
         endif
      enddo
   else !Add terminal pressure BC for all terminal branches
-    if(mesh_type.eq.'simple_tree')then !NEED TO SET GRAVITY IN THIS CASE
+    if(mesh_type.eq.'simple_tree')then
       do nonode=1,num_units
          np=elem_nodes(2,units(nonode)) !Second node in element = terminal node
          ny1=depvar_at_node(np,1,1) !for fixed pressure BC
@@ -583,10 +577,12 @@ subroutine map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_
       do  ne=1,num_elems
         ny=depvar_at_elem(1,1,ne)
         elem_field(ne_Qdot,ne)=prq_solution(ny)
+        print *, "elem_field(ne_Qdot,",ne,")=",elem_field(ne_Qdot,ne)
       enddo !elems
       do np=1,num_nodes
         ny=depvar_at_node(np,0,1)
         node_field(nj_bv_press,np)=prq_solution(ny)
+        print *, "node_field(nj_bv_press,",np,")",node_field(nj_bv_press,np)
       enddo
 
     call enter_exit(sub_name,2)
@@ -609,7 +605,9 @@ subroutine map_flow_to_terminals
       ne=units(nu)!get terminal element
       np=elem_nodes(2,ne)
       unit_field(nu_perf,nu)=elem_field(ne_Qdot,ne)
+      print *,"flow unit_field(nu_perf,",nu,")=",unit_field(nu_perf,nu)
       unit_field(nu_blood_press,nu)=node_field(nj_bv_press,np)
+      print *,"pressure unit_field(nu_blood_press,",nu,")=",unit_field(nu_blood_press,nu)
     enddo
 
     call enter_exit(sub_name,2)
@@ -689,12 +687,12 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
   	  do nn=1,2 !2 nodes in 1D element
 		np=elem_nodes(nn,ne) 
 		depvar = depvar_at_node(np,1,1)
-   	  	if((.NOT.NodePressureDone(np)).AND.(.NOT.FIX(depvar)))then !check if this node is not fixed and hasn't already been processed (as some nodes are shared between elements)
+   	  	if((.NOT.NodePressureDone(np)).AND.(.NOT.FIX(depvar)))then !check if this node is not fixed and hasn't already been processed (as nodes are shared between elements)
    	  		ne2=0
    	  		if(nn.EQ.1)then !first node of the element
    	  			ne2=ne! use the current element   	  		
    	  		elseif(nn.EQ.2)then !second node of the element
-   	  			if((bc_type.EQ.'pressure').OR.(.NOT.ElementPressureEquationDone(ne)))then !if element pressure equation for the current element hasn't been used
+   	  			if((bc_type.EQ.'pressure').OR.(.NOT.ElementPressureEquationDone(ne)))then !if bc_type is pressure or element pressure equation for the current element hasn't been used
    	  				ne2=ne! use the current element
    	  			else
    	  				!look for another element connected to this node with pressure equation that hasn't been used
