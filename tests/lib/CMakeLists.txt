@@ -11,7 +11,9 @@ set(GEOMETRY_TEST_SRCS
 set(PRF_INLET_PRESSURE_SRCS
     test_prf_inlet_pressure.pf
 )
-   
+set(PRF_INLET_FLOW_SRCS
+    test_prf_inlet_flow.pf
+)   
 #test_define_1d_elements.pf 
 #test_define_node_geometry.pf
 # Make use of the pFUnit helper function to create a test.
@@ -22,10 +24,13 @@ set(PRF_INLET_PRESSURE_SRCS
 add_pfunit_test(diagnostics_test "${DIAGNOSTICS_TEST_SRCS}" "" "")
 add_pfunit_test(geometry_test "${GEOMETRY_TEST_SRCS}" "" "")
 add_pfunit_test(prf_inlet_pressure_test "${PRF_INLET_PRESSURE_SRCS}" "" "")
+add_pfunit_test(prf_inlet_flow_test "${PRF_INLET_FLOW_SRCS}" "" "")
 # Link the test to the reprosim library target.
 target_link_libraries (diagnostics_test reprosim)
 target_link_libraries (geometry_test test_utils)
 target_link_libraries (prf_inlet_pressure_test test_utils)
+target_link_libraries (prf_inlet_flow_test test_utils)
 # We shouldn't require this line, but we do WHY???????
 target_include_directories(geometry_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/../utils)
 target_include_directories(prf_inlet_pressure_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/../utils)
+target_include_directories(prf_inlet_flow_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/../utils)

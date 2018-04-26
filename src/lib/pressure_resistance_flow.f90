@@ -561,7 +561,7 @@ subroutine map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_
 
     use indices
     use arrays,only: dp,num_nodes,num_elems,elem_field,node_field
-    use diagnostics, only: enter_exit
+    use diagnostics, only: enter_exit,get_diagnostics_level
 
     integer, intent(in) :: mesh_dof
     real(dp),intent(in) ::  prq_solution(mesh_dof)
@@ -569,22 +569,33 @@ subroutine map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_
     integer,intent(in) :: depvar_at_node(num_nodes,0:2,2)
     !local variables
     integer :: np,ne,ny
+    integer :: diagnostics_level
 
 
     character(len=60) :: sub_name
     sub_name = 'map_solution_to_mesh'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+    
       do  ne=1,num_elems
         ny=depvar_at_elem(1,1,ne)
         elem_field(ne_Qdot,ne)=prq_solution(ny)
-        print *, "elem_field(ne_Qdot,",ne,")=",elem_field(ne_Qdot,ne)
       enddo !elems
       do np=1,num_nodes
         ny=depvar_at_node(np,0,1)
         node_field(nj_bv_press,np)=prq_solution(ny)
-        print *, "node_field(nj_bv_press,",np,")",node_field(nj_bv_press,np)
       enddo
 
+      if(diagnostics_level.GT.1)then 
+        print *,"flow:"
+        do ne=1,num_elems
+          print *, "elem_field(",ne_Qdot,",",ne,")=",elem_field(ne_Qdot,ne)
+        enddo
+        print *,"pressure:"
+        do np=1,num_nodes
+          print *, "node_field(",nj_bv_press,",",np,")",node_field(nj_bv_press,np)
+        enddo  
+      endif
     call enter_exit(sub_name,2)
 end subroutine map_solution_to_mesh
 
@@ -594,21 +605,33 @@ subroutine map_flow_to_terminals
 !*Description:* This subroutine maps the solution array to appropriate nodal and element fields
     use indices
     use arrays,only: elem_field,node_field,num_units,units,unit_field,elem_nodes
-    use diagnostics, only: enter_exit
+    use diagnostics, only: enter_exit,get_diagnostics_level
     integer :: nu,ne,np
     character(len=60) :: sub_name
+    integer :: diagnostics_level
+    
     sub_name = 'map_flow_to_terminals'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
 
 	!num_units - number of terminal elements
     do nu=1,num_units    
       ne=units(nu)!get terminal element
       np=elem_nodes(2,ne)
-      unit_field(nu_perf,nu)=elem_field(ne_Qdot,ne)
-      print *,"flow unit_field(nu_perf,",nu,")=",unit_field(nu_perf,nu)
-      unit_field(nu_blood_press,nu)=node_field(nj_bv_press,np)
-      print *,"pressure unit_field(nu_blood_press,",nu,")=",unit_field(nu_blood_press,nu)
+      unit_field(nu_perf,nu)=elem_field(ne_Qdot,ne)     
+      unit_field(nu_blood_press,nu)=node_field(nj_bv_press,np)     
     enddo
+    
+    if(diagnostics_level.GT.1)then 
+      print *,"flow for terminal units:"
+      do nu=1,num_units
+        print *,"unit_field(",nu_perf,",",nu,")=",unit_field(nu_perf,nu)
+      enddo
+      print *,"pressure for terminal units:"
+      do nu=1,num_units
+        print *,"unit_field(",nu_blood_press,",",nu,")=",unit_field(nu_blood_press,nu)
+      enddo  
+    endif
 
     call enter_exit(sub_name,2)
 end subroutine map_flow_to_terminals
