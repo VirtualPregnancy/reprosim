@@ -10,14 +10,9 @@ Preamble
 ::
 
     module module name
-    !*Brief Description:* A one line descriptor of what the module does. 
+    !*Description:* description of the module 
     !
-    !*LICENSE:*
-    !
-    !
-    !
-    !*Full Description:*
-    !More info on what the module does if necessary
+    !*Contributor(s): list the contributor names
     !
       use anyothermodulesused
       implicit none
@@ -53,20 +48,19 @@ Separate subroutines as follows
     !##############################################################################
     !
 
-Begin each subroutine with its name and a brief description of its functionality
-::
-
-    !*subname:* What the subroutine does
-
-Subroutine contents:
+Begin each subroutine with a brief description of its functionality.
+This will be automatically included in the documentation. The description must follow
+the subroutine opening statement: subroutine subname(things,you,pass)
 ::
 
     subroutine subname(things,you,pass)
-    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SUBNAME: SUBNAME
+    !*Description:* What the subroutine does
+    
       use module1,only: stuff,from,module1 
       use module2
       use diagnostics, only: enter_exit
-
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SUBNAME: SUBNAME
+    
       integer, intent(in):: things
       integer, intent(out) :: you
       real(dp), intent(inout)  :: pass
@@ -82,6 +76,10 @@ Subroutine contents:
 
       call enter_exit(sub_name,2)
     end subroutine subname
+
+Note that if a subroutine has many arguments on multiple lines, the description of the 
+subroutine won't be included in the generated documentation. In that case add the subroutine 
+description to the module description.
 
 Functions
 =========

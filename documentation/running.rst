@@ -3,7 +3,7 @@
 Running
 =======
 
-The reproductive simulation library, as it's name suggests, is a library and as such the concept of running the library doesn't really exist.  However you can make use of the applications that rely on this library.  A small repository of applications is availble from `here <https://github.com/LungNoodle/lungapps>`_.  
+The reproductive simulation library, as it's name suggests, is a library and as such the concept of running the library doesn't really exist.  However you can make use of the applications that rely on this library.  A small repository of applications is available from `here <https://github.com/VirtualPregnancy/reprosim-examples>`_.  
 
 Making use of virtual environments
 ==================================
@@ -47,7 +47,7 @@ The activate script may alter the command prompt to indicate the active virtual 
   deactivate
   
 Install Reprosim into virtual environment
----------------------------------------
+-----------------------------------------
 
 With an active Python virtual environment change directory into the reprosim build directory::
 
@@ -64,7 +64,7 @@ in this directory a Python file named *setup.py* should exist.  To make the Repr
 This will create a link from the active virtual environment to the Reprosim library, thus making the Reprosim python library available from the the currently active Python environment.
 
 Test Reprosim in virtual environment
-----------------------------------
+------------------------------------
 
 With the virtual environment active that Reprosim is linked to, run python to get a command prompt::
   
@@ -72,7 +72,7 @@ With the virtual environment active that Reprosim is linked to, run python to ge
   
 and at the command prompt enter the following::
 
-  >>> from reprosim.diagnostics import set_diagnostics_on
+  >>> from reprosim.diagnostics import set_diagnostics_level
   
 if all has gone correctly ... nothing should happen! Another command prompt should appear::
 

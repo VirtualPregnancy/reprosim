@@ -19,4 +19,11 @@ List of modules
    :maxdepth: 1
 
    Modules/arrays
+   Modules/diagnostics
+   Modules/exports
    Modules/geometry
+   Modules/indices
+   Modules/math_utilities
+   Modules/other_consts
+   Modules/pressure_resistance_flow
+   Modules/solve

@@ -1,15 +1,70 @@
 module solve
-!*Brief Description:* This module contains solvers required for placenta problems
+!*Description:* This module contains solvers required for placenta problems
 !
-!*LICENSE:*
-!
-!
-!
-!*Full Description:*
-!
-!Solvers included in this module are:
+! Solvers included in this module are:
+!                                                                          
 ! BICGSTAB == The STABalized BIConjugate Gradient method
+!                                                                           
 ! GMRES == Generalised Minimal RESidual method
+!
+! GMRES solver. The following is the code from mgmres.f90, downloaded from
+! www.people.sc.fsu.edu/~jbukhardt/f_src/mgmres/mgmres.html on 13/01/2016
+!
+! Licensing:
+!    This code is distributed under the GNU LGPL license.
+! Modified:
+!    17 July 2007
+! Author:
+!    Original C version by Lili Ju.
+!    FORTRAN90 version by John Burkardt.
+! Reference:
+!    Richard Barrett, Michael Berry, Tony Chan, James Demmel,
+!    June Donato, Jack Dongarra, Victor Eijkhout, Roidan Pozo,
+!    Charles Romine, Henk van der Vorst,
+!    Templates for the Solution of Linear Systems:
+!    Building Blocks for Iterative Methods,
+!    SIAM, 1994.
+!    ISBN: 0898714710,
+!    LC: QA297.8.T45.
+!
+!    Tim Kelley,
+!    Iterative Methods for Linear and Nonlinear Equations,
+!    SIAM, 2004,
+!    ISBN: 0898713528,
+!    LC: QA297.8.K45.
+!
+!    Yousef Saad,
+!    Iterative Methods for Sparse Linear Systems,
+!    Second Edition,
+!    SIAM, 2003,
+!    ISBN: 0898715342,
+!    LC: QA188.S17.
+!
+!  Parameters:
+!    Input, integer ( kind = 4 ) N, the order of the system.
+!
+!    Input, integer ( kind = 4 ) NZ_NUM, the number of nonzeros.
+!
+!    Input, integer ( kind = 4 ) IA(N+1), JA(NZ_NUM), the row and column
+!    indices of the matrix values.  The row vector has been compressed.
+!
+!    Input, real ( kind = 8 ) A(NZ_NUM), the matrix values.
+!
+!    Input, real ( kind = 8 ) X(N), the vector to be multiplied by A'.
+!
+!    Output, real ( kind = 8 ) W(N), the value of A'*X.
+!
+! Information:
+!    The Sparse Compressed Row storage format is used.
+!
+!    The matrix A is assumed to be sparse.  To save on storage, only
+!    the nonzero entries of A are stored.  The vector JA stores the
+!    column index of the nonzero value.  The nonzero values are sorted
+!    by row, and the compressed row vector IA then has the property that
+!    the entries in A and JA that correspond to row I occur in indices
+!    IA[I] through IA[I+1]-1.
+!
+!       
   use math_utilities
   implicit none
   private
@@ -19,14 +74,16 @@ contains
 !
 !#######################################################################
 !
-!*BICGSTAB_LinSolv:*
-!   This function uses a preconditioned biconjugate gradient method to solve a
+
+subroutine BICGSTAB_LinSolv(MatrixSize,NonZeros,RHS,Solution,SparseCol,SparseRow,SparseVal,TOLER,MaxIter)
+!*Description:*
+!   This subroutine uses a preconditioned biconjugate gradient method to solve a
 !   linear system Ax=b. Currently this solver is hard-coded to use the diaganol
 !   entries of A as a preconditioner (the Jacobi preconditioner). However, this
 !   could easily be added as an input variable. Sparsity is defined by compressed
 !   row storage.
 ! Created by ARC: 15-12-2015
-
+!
 !   Input:
 !   MatrixSize -> the size of the matrix.
 !   NonZeros -> The number of non-zero entries.
@@ -34,13 +91,12 @@ contains
 !   SparseRow ->Define the indices of SparseCol that represent each row.
 !   SparseVal -> The values of non-zero entries.
 !   RHS -> The vector on the RHS of the linear system
-
+!
 !   FLAGS - 0=Solution found to tolerance
 !           1=No convergence max iterations reached
 !           -1=breakdown rho=0
 !           -2=breakdown omega=0
 
-subroutine BICGSTAB_LinSolv(MatrixSize,NonZeros,RHS,Solution,SparseCol,SparseRow,SparseVal,TOLER,MaxIter)
     use arrays
 
     !Input/Output Variables
@@ -57,7 +113,7 @@ subroutine BICGSTAB_LinSolv(MatrixSize,NonZeros,RHS,Solution,SparseCol,SparseRow
     call CPU_TIME(start)
     print *, 'In Solver, Tolerance=', TOLER, 'Max iterations=', MaxIter
 
-!!! PRECONDITIONER MATRIX - THE DIAGONALS OF THE MATRIX A P=diag(A), Jacobi preconditioner Inverse is deltaij/Aij
+! PRECONDITIONER MATRIX - THE DIAGONALS OF THE MATRIX A P=diag(A), Jacobi preconditioner Inverse is deltaij/Aij
     DO i=1,MatrixSize
         kstart=SparseRow(i)
         kend=SparseRow(i+1)-1
@@ -100,7 +156,7 @@ subroutine BICGSTAB_LinSolv(MatrixSize,NonZeros,RHS,Solution,SparseCol,SparseRow
     beta=0.0_dp
     omega=1.0_dp
 
-!!START OF ITERATIVE LOOP
+!START OF ITERATIVE LOOP
      iterative_loop: DO Iter=1,MaxIter
         !rho is dot product of r and t tilde
         rho=DOT_PRODUCT(r,rtilde) !checked against matlab
@@ -140,7 +196,7 @@ subroutine BICGSTAB_LinSolv(MatrixSize,NonZeros,RHS,Solution,SparseCol,SparseRow
         ENDIF
 
 
-        !!Stabiliser shat=precon-1*s
+        !Stabiliser shat=precon-1*s
         shat=PreConInv*s
         t=0.0_dp*s
         DO i=1,MatrixSize
@@ -188,96 +244,30 @@ end subroutine BICGSTAB_LinSolv
 !
 !#############################################################################
 !
-!*GMRES solver:*
-!!! The following is the code from mgmres.f90, downloaded from
-!!! www.people.sc.fsu.edu/~jbukhardt/f_src/mgmres/mgmres.html on 13/01/2016
-
-!!!  Licensing:
-    !    This code is distributed under the GNU LGPL license.
-!!!  Modified:
-    !    17 July 2007
-!!!  Author:
-    !    Original C version by Lili Ju.
-    !    FORTRAN90 version by John Burkardt.
-!!!  Reference:
-    !    Richard Barrett, Michael Berry, Tony Chan, James Demmel,
-    !    June Donato, Jack Dongarra, Victor Eijkhout, Roidan Pozo,
-    !    Charles Romine, Henk van der Vorst,
-    !    Templates for the Solution of Linear Systems:
-    !    Building Blocks for Iterative Methods,
-    !    SIAM, 1994.
-    !    ISBN: 0898714710,
-    !    LC: QA297.8.T45.
-    !
-    !    Tim Kelley,
-    !    Iterative Methods for Linear and Nonlinear Equations,
-    !    SIAM, 2004,
-    !    ISBN: 0898713528,
-    !    LC: QA297.8.K45.
-    !
-    !    Yousef Saad,
-    !    Iterative Methods for Sparse Linear Systems,
-    !    Second Edition,
-    !    SIAM, 2003,
-    !    ISBN: 0898715342,
-    !    LC: QA188.S17.
-
-!!!  Parameters:
-    !    Input, integer ( kind = 4 ) N, the order of the system.
-    !
-    !    Input, integer ( kind = 4 ) NZ_NUM, the number of nonzeros.
-    !
-    !    Input, integer ( kind = 4 ) IA(N+1), JA(NZ_NUM), the row and column
-    !    indices of the matrix values.  The row vector has been compressed.
-    !
-    !    Input, real ( kind = 8 ) A(NZ_NUM), the matrix values.
-    !
-    !    Input, real ( kind = 8 ) X(N), the vector to be multiplied by A'.
-    !
-    !    Output, real ( kind = 8 ) W(N), the value of A'*X.
-
-!!! Information:
-    !    The Sparse Compressed Row storage format is used.
-    !
-    !    The matrix A is assumed to be sparse.  To save on storage, only
-    !    the nonzero entries of A are stored.  The vector JA stores the
-    !    column index of the nonzero value.  The nonzero values are sorted
-    !    by row, and the compressed row vector IA then has the property that
-    !    the entries in A and JA that correspond to row I occur in indices
-    !    IA[I] through IA[I+1]-1.
-
-
-  !*****************************************************************************
-
-
-
-
-  !*****************************************************************************
-  subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, &
-       tol_abs, tol_rel,FLAG )
-!!! PMGMRES_ILU_CR applies the preconditioned restarted GMRES algorithm.
-    !    This routine uses the incomplete LU decomposition for the
-    !    preconditioning.  This preconditioner requires that the sparse
-    !    matrix data structure supplies a storage position for each diagonal
-    !    element of the matrix A, and that each diagonal element of the
-    !    matrix A is not zero.
-    !    Input/output, real ( kind = 8 ) X(N); on input, an approximation to
-    !    the solution.  On output, an improved approximation.
-    !
-    !    Input, real ( kind = 8 ) RHS(N), the right hand side of the linear system.
-    !
-    !    Input, integer ( kind = 4 ) ITR_MAX, the maximum number of (outer)
-    !    iterations to take.
-    !
-    !    Input, integer ( kind = 4 ) MR, the maximum number of (inner) iterations
-    !    to take.  MR must be less than N.
-    !
-    !    Input, real ( kind = 8 ) TOL_ABS, an absolute tolerance applied to the
-    !    current residual.
-    !
-    !    Input, real ( kind = 8 ) TOL_REL, a relative tolerance comparing the
-    !    current residual to the initial residual.
-    !
+subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, tol_rel,FLAG )
+! PMGMRES_ILU_CR applies the preconditioned restarted GMRES algorithm.
+!    This routine uses the incomplete LU decomposition for the
+!    preconditioning.  This preconditioner requires that the sparse
+!    matrix data structure supplies a storage position for each diagonal
+!    element of the matrix A, and that each diagonal element of the
+!    matrix A is not zero.
+!    Input/output, real ( kind = 8 ) X(N); on input, an approximation to
+!    the solution.  On output, an improved approximation.
+!
+!    Input, real ( kind = 8 ) RHS(N), the right hand side of the linear system.
+!
+!    Input, integer ( kind = 4 ) ITR_MAX, the maximum number of (outer)
+!    iterations to take.
+!
+!    Input, integer ( kind = 4 ) MR, the maximum number of (inner) iterations
+!    to take.  MR must be less than N.
+!
+!    Input, real ( kind = 8 ) TOL_ABS, an absolute tolerance applied to the
+!    current residual.
+!
+!    Input, real ( kind = 8 ) TOL_REL, a relative tolerance comparing the
+!    current residual to the initial residual.
+!
     implicit none
 
     integer ( kind = 4 ) mr
@@ -457,7 +447,7 @@ end subroutine BICGSTAB_LinSolv
     end if
 
     return
-  end subroutine pmgmres_ilu_cr
+end subroutine pmgmres_ilu_cr
 
 
 

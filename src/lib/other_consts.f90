@@ -1,15 +1,7 @@
-!> \file
-!> \author Merryn Tawhai
-!> \brief This module contains definition of constants
-!>
-!> \section LICENSE
-!>
-!>
-!> Contributor(s):
-!>
-!>\Description
-!> This module contains definition of constants (note that in the future this should be merged into a 'types' module
 module other_consts
+!
+!*Description:* This module contains definition of constants
+!
   use arrays, only: dp
   implicit none
 

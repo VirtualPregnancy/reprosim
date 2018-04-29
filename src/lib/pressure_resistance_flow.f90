@@ -1,13 +1,15 @@
 module pressure_resistance_flow
-!*Brief Description:* This module contains tools that are used to solve systems of equations representing steady pressure, resistance and flow problems in any branching geometry.
+!*Description:* This module contains tools that are used to solve systems of equations representing steady pressure, resistance and flow problems in any branching geometry.
 !
-!*LICENSE:*
-!TBC
-!*Contributor(s):* Monika Byrne
+!*Contributor(s):* Merryn Tawhai, Alys Clark, Monika Byrne
+!  
+! Descriptions for subroutines that are not included in the subroutine:
+!                                                                        
+!*calc_sparse_1d_tree:* sets up the system of equations to solve for pressure and flow. 
+! It populates the SparseCol,SparseRow, SparceVal and RHS vectors.
+!                                                                                 
+!*boundary_conditions:* Defines boundary conditions for prq problems
 !
-!*Full Description:*
-!
-!This module contains tools that are used to solve systems of equations representing steady pressure, resistance and flow problems in any branching geometry.  
   use solve, only: BICGSTAB_LinSolv,pmgmres_ilu_cr
   implicit none
   !Module parameters
@@ -22,13 +24,19 @@ module pressure_resistance_flow
 contains
 !###################################################################################
 !
-!*evaluate_PRQ:* Solves for pressure and flow in a rigid or compliant tree structure
-  subroutine evaluate_prq(mesh_type,bc_type,inlet_flow)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_PRQ" :: EVALUATE_PRQ
+subroutine evaluate_prq(mesh_type,bc_type,inlet_flow)
+!*Description:* Solves for pressure and flow in a rigid or compliant tree structure  
+! Model Types:                                                                     
+! mesh_type: can be simple_tree or full_plus_tube. Simple_tree can be airways, arteries,
+! veins but no special features at the terminal level, the second one has arteries and
+! veins connected by capillary units (capillaries are just tubes represented by an element)
+!                                                                                  
+! boundary condition type (bc_type): pressure or flow
     use indices
     use arrays,only: dp,num_elems,num_nodes,elem_field,elem_nodes,elem_cnct,node_xyz
     use diagnostics, only: enter_exit,get_diagnostics_level
-    
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_PRQ" :: EVALUATE_PRQ
+  
     character(len=60), intent(in) :: mesh_type,bc_type
     real(dp), intent(in) :: inlet_flow
     
@@ -56,8 +64,6 @@ contains
     sub_name = 'evaluate_prq'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
-!!---------DESCRIPTION OF MODEL Types -----------
-!mesh_type: can be simple_tree or full_plus_tube. Simple_tree can be airways, arteries, veins but no special features at the terminal level, the second one has arteries and veins connected by capillary units (capillaries are just tubes represented by an element)
 
 if((mesh_type.NE.'full_plus_tube').AND.(mesh_type.NE.'simple_tree'))then
 	print *,"unsupported mesh_type",mesh_type
@@ -94,12 +100,9 @@ if(diagnostics_level.GT.1)then
 endif
 
 !!---------PHYSICAL PARAMETERS-----------
-!viscosity: fluid viscosity
-!density:fluid density
-!gamma:Pedley correction factor
-density=0.10500e-02_dp !kg/cm3
-viscosity=0.33600e-02_dp !Pa.s
-gamma = 0.327_dp !=1.85/(4*sqrt(2))
+density=0.10500e-02_dp !kg/cm3 !density:fluid density
+viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
+gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
 
 !! Allocate memory to depvar arrays
     mesh_dof=num_elems+num_nodes
@@ -125,19 +128,13 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
     call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
       depvar_at_node,depvar_at_elem,prq_solution,mesh_dof,mesh_type)
    
-    !second call if simple tree need to define pressure bcs at all terminal branches
-    if(mesh_type.eq.'simple_tree')then
-        ADD=.TRUE.
-        call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
+    !second call to define pressure bcs at terminal branches 
+     ADD=.TRUE.
+     call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
             depvar_at_node,depvar_at_elem,prq_solution,mesh_dof,mesh_type)
-	elseif(mesh_type.eq.'full_plus_tube')then
-		ADD=.TRUE.
-		call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
-		     depvar_at_node,depvar_at_elem,prq_solution,mesh_dof,mesh_type)
-    endif
 
 !! Calculate resistance of each element
-   call calculate_resistance(viscosity,mesh_type)
+    call calculate_resistance(viscosity,mesh_type)
         
 !! Calculate sparsity structure for solution matrices
     !Determine size of and allocate solution vectors/matrices
@@ -207,13 +204,15 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
     deallocate (SparseRow, STAT = AllocateStatus)
     deallocate (RHS, STAT = AllocateStatus)
     call enter_exit(sub_name,2)
-  end subroutine evaluate_prq
+end subroutine evaluate_prq
 !
 !###################################################################################
 !
-!*boundary_conditions:* Defines boundary conditions for prq problems
- subroutine boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
-       depvar_at_node,depvar_at_elem,prq_solution,mesh_dof,mesh_type)
+subroutine boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,depvar_at_node, &
+depvar_at_elem,prq_solution,mesh_dof,mesh_type)
+
+!*Description:* Defines boundary conditions for prq problems
+
  use arrays,only: dp,num_elems,num_nodes,elem_nodes,elem_cnct,node_xyz,units,&
         num_units
     use diagnostics, only: enter_exit
@@ -254,7 +253,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
         endif
      enddo
   else !Add terminal pressure BC for all terminal branches
-    if(mesh_type.eq.'simple_tree')then !NEED TO SET GRAVITY IN THIS CASE
+    if(mesh_type.eq.'simple_tree')then
       do nonode=1,num_units
          np=elem_nodes(2,units(nonode)) !Second node in element = terminal node
          ny1=depvar_at_node(np,1,1) !for fixed pressure BC
@@ -326,10 +325,10 @@ subroutine calculate_resistance(viscosity,mesh_type)
 !
 !##################################################################
 !
-!*calc_depvar_maps:* calculates the mapping between the nodes and elements and
-!the problem depvar that are needed for matrix setup and solution
-  subroutine calc_depvar_maps(mesh_from_depvar,depvar_at_elem,&
-                depvar_totals,depvar_at_node,mesh_dof,num_vars)
+subroutine calc_depvar_maps(mesh_from_depvar,depvar_at_elem,depvar_totals,depvar_at_node,mesh_dof,num_vars)
+!*Description:* This subroutine calculates the mapping between the nodes and elements and
+! the problem dependent variables that are needed for matrix setup and solution
+              
     use arrays,only: num_elems,num_nodes,elem_nodes
     use diagnostics, only: enter_exit,get_diagnostics_level
     character(len=60) :: sub_name
@@ -423,13 +422,12 @@ subroutine calculate_resistance(viscosity,mesh_type)
      	print *,"Max ny number (number of variables)=",ny     
 	 endif
     call enter_exit(sub_name,2)
-  end subroutine calc_depvar_maps
+end subroutine calc_depvar_maps
 !
 !##################################################################
 !
-!*tree_resistance:* Calculates the total resistance of a tree (arterial tree only)
-
-  subroutine tree_resistance(resistance)
+subroutine tree_resistance(resistance)
+!*Descripton:* This subroutine calculates the total resistance of a tree (arterial tree only)
     use indices
     use arrays,only: dp,num_elems,elem_cnct,elem_field
     use diagnostics, only: enter_exit
@@ -457,14 +455,15 @@ subroutine calculate_resistance(viscosity,mesh_type)
     resistance=elem_res(1)
 
     call enter_exit(sub_name,2)
-  end subroutine tree_resistance
+end subroutine tree_resistance
 !
 !##################################################################
 !
-!*initialise_solution:* Calculates an estimate for initial solution to a prq problem based on cardiact output and pressure BCs. Unknown pressure variables are set to the average of incoming and outgoing pressures.  Unknown flow variables are set to the cardiac output divided by 2 to the power of number of branching generations
-
-subroutine initialise_solution(pressure_in,pressure_out,cardiac_output,mesh_dof,prq_solution,&
-    depvar_at_node,depvar_at_elem,FIX)
+subroutine initialise_solution(pressure_in,pressure_out,cardiac_output,mesh_dof,prq_solution,depvar_at_node,depvar_at_elem,FIX)
+!*Description:* This subroutine calculates an estimate for initial solution to a prq problem 
+! based on cardiact output and pressure BCs. Unknown pressure variables are set to the average
+! of incoming and outgoing pressures.  Unknown flow variables are set to the cardiac output
+! divided by 2 to the power of number of branching generations
 
     use indices
     use arrays,only: dp,num_elems,elem_ordrs,elem_nodes,num_nodes
@@ -499,9 +498,8 @@ subroutine initialise_solution(pressure_in,pressure_out,cardiac_output,mesh_dof,
 !
 !##################################################################
 !
-!*calc_sparse_size:* Calculates sparsity sizes
-
 subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
+!*Description:* This subroutine calculates sparsity sizes
 
     use diagnostics, only: enter_exit,get_diagnostics_level
     use arrays,only: num_elems,elem_nodes,num_nodes,elems_at_node
@@ -558,11 +556,12 @@ end subroutine calc_sparse_size
 
 !##################################################################
 !
-!*map_solution_to_mesh* maps the solution array to appropriate nodal and element fields
 subroutine map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_dof)
+!*Description:* This subroutine maps the solution array to appropriate nodal and element fields
+
     use indices
     use arrays,only: dp,num_nodes,num_elems,elem_field,node_field
-    use diagnostics, only: enter_exit
+    use diagnostics, only: enter_exit,get_diagnostics_level
 
     integer, intent(in) :: mesh_dof
     real(dp),intent(in) ::  prq_solution(mesh_dof)
@@ -570,11 +569,14 @@ subroutine map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_
     integer,intent(in) :: depvar_at_node(num_nodes,0:2,2)
     !local variables
     integer :: np,ne,ny
+    integer :: diagnostics_level
 
 
     character(len=60) :: sub_name
     sub_name = 'map_solution_to_mesh'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+    
       do  ne=1,num_elems
         ny=depvar_at_elem(1,1,ne)
         elem_field(ne_Qdot,ne)=prq_solution(ny)
@@ -584,37 +586,61 @@ subroutine map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_
         node_field(nj_bv_press,np)=prq_solution(ny)
       enddo
 
+      if(diagnostics_level.GT.1)then 
+        print *,"flow:"
+        do ne=1,num_elems
+          print *, "elem_field(",ne_Qdot,",",ne,")=",elem_field(ne_Qdot,ne)
+        enddo
+        print *,"pressure:"
+        do np=1,num_nodes
+          print *, "node_field(",nj_bv_press,",",np,")",node_field(nj_bv_press,np)
+        enddo  
+      endif
     call enter_exit(sub_name,2)
 end subroutine map_solution_to_mesh
 
 !##############################################################################
 !
-!*map_flow_to_terminals* maps the solution array to appropriate nodal and element fields
 subroutine map_flow_to_terminals
+!*Description:* This subroutine maps the solution array to appropriate nodal and element fields
     use indices
     use arrays,only: elem_field,node_field,num_units,units,unit_field,elem_nodes
-    use diagnostics, only: enter_exit
+    use diagnostics, only: enter_exit,get_diagnostics_level
     integer :: nu,ne,np
     character(len=60) :: sub_name
+    integer :: diagnostics_level
+    
     sub_name = 'map_flow_to_terminals'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
 
 	!num_units - number of terminal elements
     do nu=1,num_units    
       ne=units(nu)!get terminal element
       np=elem_nodes(2,ne)
-      unit_field(nu_perf,nu)=elem_field(ne_Qdot,ne)
-      unit_field(nu_blood_press,nu)=node_field(nj_bv_press,np)
+      unit_field(nu_perf,nu)=elem_field(ne_Qdot,ne)     
+      unit_field(nu_blood_press,nu)=node_field(nj_bv_press,np)     
     enddo
+    
+    if(diagnostics_level.GT.1)then 
+      print *,"flow for terminal units:"
+      do nu=1,num_units
+        print *,"unit_field(",nu_perf,",",nu,")=",unit_field(nu_perf,nu)
+      enddo
+      print *,"pressure for terminal units:"
+      do nu=1,num_units
+        print *,"unit_field(",nu_blood_press,",",nu,")=",unit_field(nu_blood_press,nu)
+      enddo  
+    endif
 
     call enter_exit(sub_name,2)
 end subroutine map_flow_to_terminals
 !
-
 !##################################################################
-
-subroutine get_variable_offset(depvar,MatrixSize,mesh_dof,FIX,offset)
-	integer, intent(in) :: depvar, MatrixSize, mesh_dof
+!
+subroutine get_variable_offset(depvar,mesh_dof,FIX,offset)
+!*Description*: This subroutine returns the number of fixed variables in the depvar array that came before the input depvar
+	integer, intent(in) :: depvar, mesh_dof
 	logical, intent(in) :: FIX(mesh_dof)
     integer, intent(inout) :: offset
 
@@ -631,12 +657,9 @@ end subroutine get_variable_offset
 !
 !##################################################################
 !
-!*calc_sparse_1d_tree:* 
-
-subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
-        depvar_at_node,NonZeros,MatrixSize,SparseCol,SparseRow,SparseVal,RHS,&
-        prq_solution)
-
+subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,depvar_at_node,NonZeros,MatrixSize,&
+SparseCol,SparseRow,SparseVal,RHS,prq_solution)
+!*Description:* This subroutine sets up the system of equations to solve for pressure and flow. It populates the SparseCol,SparseRow, SparceVal and RHS vectors.
     use indices
     use arrays,only: dp,num_elems,elem_nodes,num_nodes,elems_at_node,elem_cnct,elem_field
     use diagnostics, only: enter_exit,get_diagnostics_level
@@ -687,12 +710,12 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
   	  do nn=1,2 !2 nodes in 1D element
 		np=elem_nodes(nn,ne) 
 		depvar = depvar_at_node(np,1,1)
-   	  	if((.NOT.NodePressureDone(np)).AND.(.NOT.FIX(depvar)))then !check if this node is not fixed and hasn't already been processed (as some nodes are shared between elements)
+   	  	if((.NOT.NodePressureDone(np)).AND.(.NOT.FIX(depvar)))then !check if this node is not fixed and hasn't already been processed (as nodes are shared between elements)
    	  		ne2=0
    	  		if(nn.EQ.1)then !first node of the element
    	  			ne2=ne! use the current element   	  		
    	  		elseif(nn.EQ.2)then !second node of the element
-   	  			if(.NOT.ElementPressureEquationDone(ne))then !if element pressure equation for the current element hasn't been used
+   	  			if((bc_type.EQ.'pressure').OR.(.NOT.ElementPressureEquationDone(ne)))then !if bc_type is pressure or element pressure equation for the current element hasn't been used
    	  				ne2=ne! use the current element
    	  			else
    	  				!look for another element connected to this node with pressure equation that hasn't been used
@@ -723,7 +746,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
 					RHS(nzz_row) = -prq_solution(depvar1)
 				else
 					!unknown variable -pressure for node 1
-					call get_variable_offset(depvar1,MatrixSize,mesh_dof,FIX,offset)		
+					call get_variable_offset(depvar1,mesh_dof,FIX,offset)
 					SparseCol(nzz) = depvar1 - offset !variable number
 					SparseVal(nzz)=1.0_dp !variable coefficient
 					nzz=nzz+1 !next column	
@@ -733,7 +756,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
 					RHS(nzz_row) = prq_solution(depvar2)
 				else
 					!unknown variable - pressure for node 2
-					call get_variable_offset(depvar2,MatrixSize,mesh_dof,FIX,offset)		
+					call get_variable_offset(depvar2,mesh_dof,FIX,offset)		
 					SparseCol(nzz) = depvar2 - offset !variable number
 					SparseVal(nzz)=-1.0_dp !variable coefficient
 					nzz=nzz+1 !next column	
@@ -743,7 +766,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
 					RHS(nzz_row) = prq_solution(depvar3)*elem_field(ne_resist,ne2)			
 				else
 					!unknown flow
-					call get_variable_offset(depvar3,MatrixSize,mesh_dof,FIX,offset)			
+					call get_variable_offset(depvar3,mesh_dof,FIX,offset)			
 					SparseCol(nzz) = depvar3-offset !variable position in the unknown variable vector
 					SparseVal(nzz)=-elem_field(ne_resist,ne2) !variable coefficient = resistance for element ne2
 					nzz=nzz+1 !next column	 				
@@ -779,7 +802,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
               			RHS(nzz_row)=-prq_solution(depvar)*flow_term
               		else
                 		!populate SparseCol and SparseVal
-			  			call get_variable_offset(depvar,MatrixSize,mesh_dof,FIX,offset)			
+			  			call get_variable_offset(depvar,mesh_dof,FIX,offset)			
 			  			SparseCol(nzz) = depvar - offset
               			SparseVal(nzz) = flow_term 
               			nzz = nzz + 1             	                          
@@ -804,7 +827,7 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
       		depvar2=depvar_at_node(np2,1,1) !pressure variable for second node	
 			
 			!unknown variable -pressure for node 1
-			call get_variable_offset(depvar1,MatrixSize,mesh_dof,FIX,offset)		
+			call get_variable_offset(depvar1,mesh_dof,FIX,offset)		
 			SparseCol(nzz) = depvar1 - offset !variable number
 			SparseVal(nzz)=1.0_dp !variable coefficient
 			nzz=nzz+1 !next column	
@@ -814,14 +837,14 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,&
 				RHS(nzz_row) = prq_solution(depvar2)
 			else
 				!unknown variable - pressure for node 2
-				call get_variable_offset(depvar2,MatrixSize,mesh_dof,FIX,offset)		
+				call get_variable_offset(depvar2,mesh_dof,FIX,offset)		
 				SparseCol(nzz) = depvar2 - offset !variable number
 				SparseVal(nzz)=-1.0_dp !variable coefficient
 				nzz=nzz+1 !next column	
 			endif
 				
 			!unknown flow
-			call get_variable_offset(flow_var,MatrixSize,mesh_dof,FIX,offset)			
+			call get_variable_offset(flow_var,mesh_dof,FIX,offset)			
 			SparseCol(nzz) = flow_var-offset !variable position in the unknown variable vector
 			SparseVal(nzz)=-elem_field(ne_resist,ne) !variable coefficient = resistance for element ne
 			nzz=nzz+1 !next column	 				

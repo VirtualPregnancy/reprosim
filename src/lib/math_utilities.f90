@@ -1,14 +1,6 @@
 module math_utilities
-!*Brief Description:* This module contains solvers required for lung problems
+!*Description:* This module contains solvers required for blood vessel problems
 !
-!*LICENSE:*
-!
-!
-!
-!*Full Description:*
-!
-!
-
   implicit none
   private
   public ax_cr,diagonal_pointer_cr,ilu_cr,lus_cr,mult_givens,rearrange_cr
@@ -17,8 +9,8 @@ contains
 !
 !###########################################################################
 !
-!*ax_cr:* Computes A*x for a matrix stored in sparse compressed row form
   subroutine ax_cr ( n, ia, ja, a, x, w )
+  !*Description:* Computes A*x for a matrix stored in sparse compressed row form
     implicit none
 
     integer ( kind = 4 ) n !the order of the system
@@ -45,12 +37,11 @@ contains
 !
 !##############################################################################
 !
-! *ILU_CR:* computes the incomplete LU factorization of a matrix. For a matrix
-! stored in compressed row format.
-    !    Input, integer ( kind = 4 ) UA(N), the index of the diagonal element
-    !    of each row.
-    !    Output, real ( kind = 8 ) L(NZ_NUM), the ILU factorization of A.
   subroutine ilu_cr ( n, nz_num, ia, ja, a, ua, l )
+  ! *Description:* computes the incomplete LU factorization of a matrix. For a matrix
+  ! stored in compressed row format.
+  ! Input, integer ( kind = 4 ) UA(N), the index of the diagonal element of each row.
+  ! Output, real ( kind = 8 ) L(NZ_NUM), the ILU factorization of A.  
     integer ( kind = 4 ) n
     integer ( kind = 4 ) nz_num
     integer ( kind = 4 ) ia(*) !ia(n+1)
@@ -118,11 +109,11 @@ contains
 !
 !##############################################################################
 !
-!*DIAGONAL_POINTER_CR:* finds diagonal entries in a sparse compressed row matrix.
-    !    The array UA can be used to locate the diagonal elements of the matrix.
-    !    It is assumed that every row of the matrix includes a diagonal element,
-    !    and that the elements of each row have been ascending sorted.
 subroutine diagonal_pointer_cr ( n, ia, ja, ua )
+!*Description:* finds diagonal entries in a sparse compressed row matrix.
+! The array UA can be used to locate the diagonal elements of the matrix.
+! It is assumed that every row of the matrix includes a diagonal element,
+! and that the elements of each row have been ascending sorted.
     integer ( kind = 4 ) n
     integer ( kind = 4 ) ia(*) !ia(n+1)
     integer ( kind = 4 ) ja(*) !ja(nz_num)
@@ -146,14 +137,14 @@ subroutine diagonal_pointer_cr ( n, ia, ja, ua )
   !*****************************************************************************80
 
   subroutine lus_cr ( n, ia, ja, l, ua, r, z )
-!!! LUS_CR applies the incomplete LU preconditioner.
-    !    The linear system M * Z = R is solved for Z.  M is the incomplete
-    !    LU preconditioner matrix, and R is a vector supplied by the user.
-    !    So essentially, we're solving L * U * Z = R.
-    !    Input, integer ( kind = 4 ) UA(N), the index of the diagonal element
-    !    of each row.
-    !    Input, real ( kind = 8 ) R(N), the right hand side.
-    !    Output, real ( kind = 8 ) Z(N), the solution of the system M * Z = R.
+!*Description:* this subroutine applies the incomplete LU preconditioner.
+! The linear system M * Z = R is solved for Z.  M is the incomplete
+! LU preconditioner matrix, and R is a vector supplied by the user.
+! So essentially, we're solving L * U * Z = R.
+! Input, integer ( kind = 4 ) UA(N), the index of the diagonal element
+! of each row.
+! Input, real ( kind = 8 ) R(N), the right hand side.
+! Output, real ( kind = 8 ) Z(N), the solution of the system M * Z = R.
     implicit none
 
     integer ( kind = 4 ) n
@@ -194,17 +185,14 @@ subroutine diagonal_pointer_cr ( n, ia, ja, ua )
 
   !*****************************************************************************80
   subroutine mult_givens ( c, s, k, g )
-!!! MULT_GIVENS applies a Givens rotation to two successive entries of a vector.
-    !    In order to make it easier to compare this code with the Original C,
-    !    the vector indexing is 0-based.
-    !    Input, real ( kind = 8 ) C, S, the cosine and sine of a Givens
-    !    rotation.
-    !
-    !    Input, integer ( kind = 4 ) K, indicates the location of the first
-    !    vector entry.
-    !
-    !    Input/output, real ( kind = 8 ) G(1:K+1), the vector to be modified.
-    !    On output, the Givens rotation has been applied to entries G(K) and G(K+1).
+!*Description:* This subroutine applies a Givens rotation to two successive entries of a vector.
+! In order to make it easier to compare this code with the Original C, the vector indexing is 0-based.
+! Input, real ( kind = 8 ) C, S, the cosine and sine of a Givens rotation.
+!
+! Input, integer ( kind = 4 ) K, indicates the location of the first vector entry.
+!
+! Input/output, real ( kind = 8 ) G(1:K+1), the vector to be modified.
+! On output, the Givens rotation has been applied to entries G(K) and G(K+1).
 
     implicit none
 
@@ -228,25 +216,24 @@ subroutine diagonal_pointer_cr ( n, ia, ja, ua )
 
   !*****************************************************************************80
   subroutine rearrange_cr ( n, ia, ja, a )
-!!! REARRANGE_CR sorts a sparse compressed row matrix.
-    !    This routine guarantees that the entries in the CR matrix
-    !    are properly sorted.
-    !
-    !    After the sorting, the entries of the matrix are rearranged in such
-    !    a way that the entries of each column are listed in ascending order
-    !    of their column values.
-    !    Input, integer ( kind = 4 ) N, the order of the system.
-    !
-    !    Input, integer ( kind = 4 ) NZ_NUM, the number of nonzeros.
-    !
-    !    Input, integer ( kind = 4 ) IA(N+1), the compressed row indices.
-    !
-    !    Input/output, integer ( kind = 4 ) JA(NZ_NUM), the column indices.
-    !    On output, these may have been rearranged by the sorting.
-    !
-    !    Input/output, real ( kind = 8 ) A(NZ_NUM), the matrix values.  On output,
-    !    the matrix values may have been moved somewhat because of the sorting.
-    !
+!*Description:* This subroutine sorts a sparse compressed row matrix.
+! It guarantees that the entries in the CR matrix are properly sorted.
+!
+! After the sorting, the entries of the matrix are rearranged in such
+! a way that the entries of each column are listed in ascending order
+! of their column values.
+! Input, integer ( kind = 4 ) N, the order of the system.
+!
+! Input, integer ( kind = 4 ) NZ_NUM, the number of nonzeros.
+!
+! Input, integer ( kind = 4 ) IA(N+1), the compressed row indices.
+!
+! Input/output, integer ( kind = 4 ) JA(NZ_NUM), the column indices.
+! On output, these may have been rearranged by the sorting.
+!
+! Input/output, real ( kind = 8 ) A(NZ_NUM), the matrix values.  On output,
+!    the matrix values may have been moved somewhat because of the sorting.
+!
     implicit none
 
     integer ( kind = 4 ) n

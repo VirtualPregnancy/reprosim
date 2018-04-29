@@ -1,16 +1,9 @@
-!> \file
-!> \author Merryn Tawhai, Alys Clark
-!> \brief This module creates indices used by multiple modules in this package.
-!>
-!> \section LICENSE
-!>
-!>
-!> Contributor(s):
-!>
-!>\Description
-!> This module creates indices used by multiple modules in this package.
-
 module indices
+! 
+!*Description:* This module creates indices used by multiple modules in this package.
+!
+!*Contributor(s):* Merryn Tawhai, Alys Clark
+!
   implicit none
 !parameters
   ! indices for elem_ordrs
@@ -49,10 +42,11 @@ contains
 !
 !> Perfusion indices
   subroutine perfusion_indices
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_PERFUSION_INDICES" :: PERFUSION_INDICES
 
     use diagnostics, only: enter_exit
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_PERFUSION_INDICES" :: PERFUSION_INDICES
+    
     character(len=60) :: sub_name
 
     sub_name = 'perfusion_indices'
@@ -81,11 +75,11 @@ contains
   end subroutine perfusion_indices
 
   function get_ne_radius() result(res)
+  
+    use diagnostics, only: enter_exit
+    implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_GET_NE_RADIUS" :: GET_NE_RADIUS
 
-    use diagnostics, only: enter_exit
-
-    implicit none
     character(len=60) :: sub_name
     integer :: res
 

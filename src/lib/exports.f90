@@ -1,14 +1,8 @@
-!> \file
-!> \author Merryn Tawhai
-!> \brief This module handles all export functions
-!>
-!> \section LICENSE
-!>
-!>
-!> Contributor(s):
-!>
-!>\Description
-!> This module handles all export functions
+!
+!*Description:* This module handles all export functions
+!
+!*Contributor(s):* Merryn Tawhai
+!
 module exports
   implicit none
 
@@ -21,11 +15,12 @@ contains
 !!!################################################################
 
   subroutine export_1d_elem_field(ne_field, EXELEMFILE, group_name, field_name )
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_1D_ELEM_FIELD" :: EXPORT_1D_ELEM_FIELD
+ 
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     use arrays,only: elem_field,num_elems
     implicit none
-
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_1D_ELEM_FIELD" :: EXPORT_1D_ELEM_FIELD
+  
 !!! Parameters
     integer, intent(in) :: ne_field
     character(len=MAX_FILENAME_LEN), intent(in) :: EXELEMFILE
@@ -71,11 +66,11 @@ contains
 !!!############################################################################
 
   subroutine export_1d_elem_geometry(EXELEMFILE, name)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_1D_ELEM_GEOMETRY" :: EXPORT_1D_ELEM_GEOMETRY
 
     use arrays,only: elem_nodes,num_elems
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_1D_ELEM_GEOMETRY" :: EXPORT_1D_ELEM_GEOMETRY
 
 !!! Parameters
     character(len=MAX_FILENAME_LEN), intent(in) :: EXELEMFILE
@@ -130,11 +125,11 @@ contains
 !!!##########################################################################
 
   subroutine export_node_geometry(EXNODEFILE, name)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_NODE_GEOMETRY" :: EXPORT_NODE_GEOMETRY
-
+  
     use arrays,only: node_xyz,num_nodes
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_NODE_GEOMETRY" :: EXPORT_NODE_GEOMETRY
 
 !!! Parameters
     character(len=MAX_FILENAME_LEN),intent(in) :: EXNODEFILE
@@ -183,13 +178,13 @@ contains
 !!!########################################################################
 
   subroutine export_terminal_perfusion(EXNODEFILE, name)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_TERMINAL_PERFUSION" :: EXPORT_TERMINAL_PERFUSION
-
+  
     use arrays,only: elem_nodes,&
          node_xyz,num_units,units,unit_field
     use indices
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_TERMINAL_PERFUSION" :: EXPORT_TERMINAL_PERFUSION
 
 !!! Parameters
     character(len=MAX_FILENAME_LEN),intent(in) :: EXNODEFILE
@@ -254,11 +249,11 @@ contains
 !!! #################################################################
 
   subroutine export_node_field(nj_field, EXNODEFIELD, name, field_name)
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_NODE_FIELD" :: EXPORT_NODE_FIELD
-
+  
     use arrays,only: node_field,num_nodes
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_NODE_FIELD" :: EXPORT_NODE_FIELD
 
 !!! Parameters
     integer,intent(in) :: nj_field

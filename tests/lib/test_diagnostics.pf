@@ -11,4 +11,3 @@ subroutine testSetDiagnostics()
    @assertEqual(1,level)
 
 end subroutine testSetDiagnostics
-
