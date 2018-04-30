@@ -1,8 +1,6 @@
 module pressure_resistance_flow
 !*Description:* This module contains tools that are used to solve systems of equations representing steady pressure, resistance and flow problems in any branching geometry.
-!
-!*Contributor(s):* Merryn Tawhai, Alys Clark, Monika Byrne
-!  
+! 
 ! Descriptions for subroutines that are not included in the subroutine:
 !                                                                        
 !*calc_sparse_1d_tree:* sets up the system of equations to solve for pressure and flow. 

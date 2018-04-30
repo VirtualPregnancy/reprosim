@@ -2,8 +2,6 @@ module indices
 ! 
 !*Description:* This module creates indices used by multiple modules in this package.
 !
-!*Contributor(s):* Merryn Tawhai, Alys Clark
-!
   implicit none
 !parameters
   ! indices for elem_ordrs

@@ -1,8 +1,6 @@
 !
 !*Description:* This module handles all export functions
 !
-!*Contributor(s):* Merryn Tawhai
-!
 module exports
   implicit none
 

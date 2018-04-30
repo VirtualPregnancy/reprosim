@@ -1,7 +1,6 @@
 module diagnostics
 !*Description:* This module handles diagnostics. There are 3 diagnostic levels available: level 0 - no diagnostics; level 1- prints subroutine names; and level 2- prints subroutine names as well as variables that each subroutine calculates.
 !
-!*Contributor(s):* Merryn Tawhai, Monika Byrne
 
   implicit none
   integer :: diagnostics_level ! level 0 - no diagnostics level 1 - only prints subroutine names, level 2 - prints sub names and contents of variables

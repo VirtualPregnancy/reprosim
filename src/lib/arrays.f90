@@ -1,7 +1,6 @@
 module arrays
 !*Description:* This module defines arrays.
 !
-!*Contributor(s):* Merryn Tawhai, Alys Clark
 
   implicit none
 
