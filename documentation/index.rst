@@ -18,3 +18,4 @@ Contents
    running
    modules
    fortranstyles
+   contributors
