@@ -38,6 +38,21 @@ contains
 !
 !###################################################################################
 !
+!*calc_terminal_unit_length:* Calculates the effective length of terminal units
+  subroutine calc_terminal_unit_length_c() bind(C, name="calc_terminal_unit_length_c")
+    use geometry, only: calc_terminal_unit_length
+    implicit none
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_calc_terminal_unit_length
+#else
+    call calc_terminal_unit_length
+#endif
+
+  end subroutine calc_terminal_unit_length_c
+!
+!###################################################################################
+!
   subroutine define_1d_elements_c(ELEMFILE, filename_len) bind(C, name="define_1d_elements_c")
 
     use iso_c_binding, only: c_ptr
@@ -146,6 +161,25 @@ contains
 #endif
 
   end subroutine evaluate_ordering_c
+
+
+!
+!###################################################################################
+!
+!*set_capillary_values:* Sets the number of terminal convolute connections (num_convolutes) 
+!   and the number of generations of symmetric intermediate villous trees (num_generations) 
+  subroutine set_capillary_values_c(convolutes,generations) bind(C, name="set_capillary_values_c")
+    use geometry, only: set_capillary_values
+    implicit none
+
+    integer, intent(in) :: convolutes,generations
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_set_capillary_values(convolutes,generations)
+#else
+    call set_capillary_values(convolutes,generations)
+#endif
+
+  end subroutine set_capillary_values_c
 
 
 end module geometry_c

@@ -14,12 +14,14 @@ module geometry
   private
   public add_matching_mesh
   public append_units
+  public calc_terminal_unit_length
   public define_1d_elements
   public define_node_geometry
   public define_rad_from_geom
   public element_connectivity_1d
   public evaluate_ordering
   public get_final_real
+  public set_capillary_values
 
 contains
 !
@@ -39,10 +41,9 @@ contains
     !Parameters to become inputs
     real(dp) :: offset(3)
     logical :: REVERSE=.TRUE.
-    character(len=60) :: mesh_type='terminal'
     !local variables
     integer :: num_nodes_new,num_elems_new,ne,ne_global,np,np_global,np0,nonode,np_m
-    integer :: nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter
+    integer :: nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter,i,j
     integer, allocatable :: np_map(:)
     character(len=60) :: sub_name
     integer :: diagnostics_level
@@ -61,14 +62,8 @@ contains
     ! the number of nodes after adding mesh will be:
     num_nodes_new = 2*num_nodes
     ! the number of elems after adding mesh will be:
-    if(mesh_type.eq.'basic')then
-      num_elems_new = 2*num_elems
-    elseif(mesh_type.eq.'terminal')then
-      num_elems_new = 2*num_elems + num_units
-    endif
-    if(diagnostics_level.GT.1)then
-    		print *,"mesh_type",mesh_type
-    	endif
+    num_elems_new = 2*num_elems + num_units
+  
     call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
     noelem0=0
     ne0 = num_elems ! the starting local element number
@@ -134,10 +129,10 @@ contains
      np0=np !current highest node
      ne1=ne !current highest element
      noelem0=num_elems+noelem0
-	 if(mesh_type.eq.'terminal')then
-       cap_conns=0
-       cap_term=0
-       do nu=1,num_units
+
+     cap_conns=0
+     cap_term=0
+     do nu=1,num_units
          ne=units(nu)
          cap_term=cap_term+1
          np1=elem_nodes(2,ne)
@@ -166,15 +161,30 @@ contains
          nindex=no_hord
          elem_ordrs(nindex,ne1)=elem_ordrs(nindex,ne_m)
          elem_field(ne_group,ne1)=1.0_dp!connection between meshes
-       enddo
-       if(diagnostics_level.GT.1)then
-       	 print *, 'Number of connections', cap_term
-       endif
-     endif
+    enddo
+    if(diagnostics_level.GT.1)then
+      print *, 'Number of connections', cap_term
+    endif
+ 
     num_nodes=num_nodes_new
     num_arterial_elems = num_elems
     num_elems=num_elems_new
-    
+  
+    !calculate the element lengths and directions for the venous elements
+    do ne=num_arterial_elems+1,num_elems
+       np1=elem_nodes(1,ne)
+       np2=elem_nodes(2,ne)
+       elem_field(ne_length,ne) = DSQRT((node_xyz(1,np2) - &
+            node_xyz(1,np1))**2 + (node_xyz(2,np2) - &
+            node_xyz(2,np1))**2 + (node_xyz(3,np2) - &
+            node_xyz(3,np1))**2)   
+       do j=1,3
+          elem_direction(j,ne) = (node_xyz(j,np2) - &
+               node_xyz(j,np1))/elem_field(ne_length,ne)           
+       enddo
+    enddo
+
+  
     if(diagnostics_level.GT.1)then 
         print *, "num_nodes=",num_nodes
         print *, "num_arterial_elems=",num_arterial_elems
@@ -304,6 +314,109 @@ contains
 
   end subroutine append_units
 
+!
+!###################################################################################
+!
+  subroutine calc_terminal_unit_length()
+  !*Description:* Calculates the effective length of a terminal unit based on its total resistance
+  ! and radius. 
+    use arrays,only: dp, num_convolutes, num_generations,num_units,units,elem_field,elem_direction, &
+                     node_xyz,elem_nodes,elem_cnct
+    use diagnostics, only: enter_exit,get_diagnostics_level
+    use other_consts, only: PI
+    use indices, only: ne_length,ne_radius
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_TERMINAL_UNIT_LENGTH" :: CALC_TERMINAL_UNIT_LENGTH
+
+    real(dp) :: int_length,int_radius,cap_length,cap_radius,seg_length,viscosity, &
+                seg_resistance,cap_resistance,terminal_resistance,total_resistance,cap_unit_radius
+    real(dp),allocatable :: resistance(:)
+    integer :: ne,nu,i,j,np1,np2,nc
+    integer :: AllocateStatus
+    character(len=60) :: sub_name
+    integer:: diagnostics_level
+
+    sub_name = 'calc_terminal_unit_length'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+
+    !check number of capillary convolutes and number of intermediate villous tree generations
+    if (num_convolutes.LE.0)then
+      num_convolutes = 6
+    endif
+    if (num_generations.LE.0)then
+      num_generations = 3
+    endif
+    if (diagnostics_level.GE.1)then
+      print *, "num_convolutes=",num_convolutes
+      print *, "num_generations=",num_generations
+    endif
+
+    allocate (resistance(num_convolutes+1), STAT = AllocateStatus)
+    if (AllocateStatus /= 0)then
+       STOP "*** Not enough memory for resistance array ***"
+    endif
+
+    !calculate total resistance of terminal capillary conduits    
+    int_length=1.5_dp !mm Length of each intermediate villous
+    int_radius=0.030_dp/2  !0.0015; mm radius of each intermediate villous
+    print *,"int_radius=",int_radius
+    cap_length=3_dp !mm length of capillary convolutes
+    cap_radius=0.0144_dp/2 !radius of capillary convolutes
+    print *,"cap_radius=",cap_radius
+    seg_length=int_length/num_convolutes !lengh of each intermediate villous segment
+    print *,"seg_length",seg_length
+    !viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
+    viscosity = 4e-3_dp
+	
+    seg_resistance=(8.d0*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
+    print *,"seg_resistance",seg_resistance
+    cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
+    print *,"cap_resistance",cap_resistance
+
+    i=1
+    resistance(i)= cap_resistance + 2.d0*seg_resistance
+    do i=2,num_convolutes+1
+      resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1)) 
+    enddo
+    print *, resistance
+    terminal_resistance = resistance(num_convolutes+1) !Pa . s per mm^3 total resistance of terminal capillary conduits
+	
+    !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
+    !of the system by summing the resistance of each generation
+    total_resistance = 0
+    do j=1,num_generations
+      total_resistance = total_resistance + terminal_resistance/2**j
+    enddo
+
+    if(diagnostics_level.GE.1)then
+      print *, "terminal_resistance=",terminal_resistance
+      print *, "total_resistanc=",total_resistance	
+    endif
+
+    !calculate the effective length of each capillary unit based on its radius  
+    cap_unit_radius = 0.030_dp  
+    do nu=1,num_units
+      ne =units(nu) !Get a terminal unit
+      nc = elem_cnct(1,1,ne) !capillary unit is downstream of the terminal unit
+      print *, "nc=",nc
+      !udpate element radius
+      elem_field(ne_radius,nc) = cap_unit_radius
+      !update element length   
+      elem_field(ne_length,nc) = total_resistance*(PI*elem_field(ne_radius,nc)**4)/(8.d0*viscosity)
+      print *,"nc effective length=",elem_field(ne_length,nc)
+      !update element direction
+      np1=elem_nodes(1,nc)
+      np2=elem_nodes(2,nc)
+      do j=1,3
+        elem_direction(j,nc) = (node_xyz(j,np2) - &
+               node_xyz(j,np1))/elem_field(ne_length,nc)           
+      enddo
+    enddo
+
+    call enter_exit(sub_name,2)
+
+  end subroutine calc_terminal_unit_length
 !
 !###################################################################################
 !
@@ -1132,9 +1245,35 @@ contains
     enddo
 
   end function inlist
-
 !
 !###########################################################################################
+!
+  subroutine set_capillary_values(convolutes,generations)
+  !*Description:* Sets the number of terminal convolute connections (num_convolutes) 
+  ! and the number of generations of symmetric intermediate villous trees (num_generations) 
+    use arrays,only: num_convolutes, num_generations
+    use diagnostics, only: enter_exit,get_diagnostics_level
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SET_CAPILLARY_VALUES" :: SET_CAPILLARY_VALUES
+
+    integer, intent(in) :: convolutes,generations
+  
+    character(len=60) :: sub_name
+    integer:: diagnostics_level
+
+    sub_name = 'set_capillary_values'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+
+    num_convolutes = convolutes
+    num_generations = generations
+
+    call enter_exit(sub_name,2)
+
+  end subroutine set_capillary_values
+
+!
+!###################################################################################
 !
 end module geometry
 

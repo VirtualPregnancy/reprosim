@@ -5,6 +5,7 @@
 
 void add_matching_mesh_c();
 void append_units_c();
+void calc_terminal_unit_length_c();
 void define_1d_elements_c(const char *ELEMFILE, int *filename_len);
 void define_node_geometry_c(const char *NODEFILE, int *filename_len);
 void define_rad_from_geom_c(const char *order_system, int *order_system_len, double *control_param,
@@ -12,6 +13,7 @@ void define_rad_from_geom_c(const char *order_system, int *order_system_len, dou
                             const char *group_type, int *group_type_len, const char *group_options, int *group_options_len);
 void element_connectivity_1d_c();
 void evaluate_ordering_c();
+void set_capillary_values_c(int *convolutes, int *generations);
 
 
 void add_matching_mesh()
@@ -22,6 +24,11 @@ void add_matching_mesh()
 void append_units()
 {
   append_units_c();
+}
+
+void calc_terminal_unit_length()
+{
+  calc_terminal_unit_length_c();
 }
 
 void define_1d_elements(const char *ELEMFILE)
@@ -56,4 +63,9 @@ void element_connectivity_1d()
 void evaluate_ordering()
 {
   evaluate_ordering_c();
+}
+
+void set_capillary_values(int convolutes, int generations)
+{
+  set_capillary_values_c(&convolutes,&generations);
 }

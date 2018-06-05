@@ -25,9 +25,10 @@ contains
 subroutine evaluate_prq(mesh_type,bc_type,inlet_flow)
 !*Description:* Solves for pressure and flow in a rigid or compliant tree structure  
 ! Model Types:                                                                     
-! mesh_type: can be simple_tree or full_plus_tube. Simple_tree can be airways, arteries,
-! veins but no special features at the terminal level, the second one has arteries and
-! veins connected by capillary units (capillaries are just tubes represented by an element)
+! mesh_type: can be 'simple_tree' or 'full_plus_tube'. Simple_tree is the input arterial tree 
+! without any special features at the terminal level
+! 'full_plus_tube' creates a matching venous mesh and has arteries and veins connected by
+! capillary units (capillaries are just tubes represented by an element)
 !                                                                                  
 ! boundary condition type (bc_type): pressure or flow
     use indices
@@ -298,21 +299,10 @@ subroutine calculate_resistance(viscosity,mesh_type)
        !ne=elems(noelem)
        np1=elem_nodes(1,ne)
        np2=elem_nodes(2,ne)
-       ! element length
-       elem_field(ne_length,ne) = DSQRT((node_xyz(1,np2) - &
-            node_xyz(1,np1))**2 + (node_xyz(2,np2) - &
-            node_xyz(2,np1))**2 + (node_xyz(3,np2) - &
-            node_xyz(3,np1))**2)
-       elem_field(ne_radius,ne)=(elem_field(ne_radius_in,ne)+elem_field(ne_radius_out,ne))/2.0_dp
        ! element Poiseuille (laminar) resistance in units of Pa.s.mm-3        
        resistance = 8.d0*viscosity*elem_field(ne_length,ne)/ &
             (PI*elem_field(ne_radius,ne)**4) !laminar resistance
-       ! element turbulent resistance (flow in bifurcating tubes)
-       !reynolds=DABS(elem_field(ne_Qdot,ne)*2.d0*density/ &
-         !   (PI*elem_field(ne_radius,ne)*viscosity))
-       zeta = 1.0_dp!MAX(1.d0,dsqrt(2.d0*elem_field(ne_radius,ne)* &
-            !reynolds/elem_field(ne_length,ne))*gamma)
-       elem_field(ne_resist,ne) = resistance * zeta
+       elem_field(ne_resist,ne) = resistance
        if(diagnostics_level.GT.1)then
        		print *,"TESTING RESISTANCE: element",ne,"resistance",elem_field(ne_resist,ne),"radius",elem_field(ne_radius,ne)
        endif

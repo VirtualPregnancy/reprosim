@@ -4,7 +4,7 @@ module arrays
 
   implicit none
 
-  integer :: num_elems,num_nodes,num_units,maxgen,num_arterial_elems
+  integer :: num_elems,num_nodes,num_units,maxgen,num_arterial_elems,num_convolutes,num_generations
 
   integer, parameter :: dp=kind(0.d0) !  for double precision
 
@@ -30,7 +30,8 @@ module arrays
   private
   public set_node_field_value, elem_field, num_elems, elem_nodes, node_xyz, nodes, elems, &
     num_nodes, units, num_units, unit_field, node_field, dp, elem_cnct, elem_ordrs, elem_direction, &
-    elems_at_node, elem_symmetry, elem_units_below, maxgen, num_arterial_elems
+    elems_at_node, elem_symmetry, elem_units_below, maxgen, num_arterial_elems, &
+    num_convolutes, num_generations
 
 contains
   subroutine set_node_field_value(row, col, value)  
