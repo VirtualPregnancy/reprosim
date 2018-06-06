@@ -16,7 +16,7 @@
     character(LEN=100) :: order_system,order_options,name
     real(dp) :: s_ratio, inlet_rad
     character(LEN=60) :: mesh_type, bc_type
-    real(dp) :: inlet_flow
+    real(dp) :: inlet_flow,inlet_pressure,outlet_pressure
     real(dp) :: test_elem_field(1,8) !(num_ne: num_elems)
     real(dp) :: test_node_field(1,8) !(num_nj : num_nodes)
     real(dp) :: test_unit_field(2,2) !(2 : num_units)
@@ -52,7 +52,9 @@
     mesh_type = "full_plus_tube"
     bc_type = "flow"
     inlet_flow = 37222.0_dp
-    call evaluate_prq(mesh_type,bc_type,inlet_flow)
+    inlet_pressure = 0.0_dp
+    outlet_pressure = 0.0_dp
+    call evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_pressure)
       
     !populate test data
     call set_flow(test_elem_field) 

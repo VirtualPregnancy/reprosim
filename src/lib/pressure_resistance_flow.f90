@@ -22,7 +22,7 @@ module pressure_resistance_flow
 contains
 !###################################################################################
 !
-subroutine evaluate_prq(mesh_type,bc_type,inlet_flow)
+subroutine evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_pressure)
 !*Description:* Solves for pressure and flow in a rigid or compliant tree structure  
 ! Model Types:                                                                     
 ! mesh_type: can be 'simple_tree' or 'full_plus_tube'. Simple_tree is the input arterial tree 
@@ -37,7 +37,7 @@ subroutine evaluate_prq(mesh_type,bc_type,inlet_flow)
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_PRQ" :: EVALUATE_PRQ
   
     character(len=60), intent(in) :: mesh_type,bc_type
-    real(dp), intent(in) :: inlet_flow
+    real(dp), intent(in) :: inlet_flow,inlet_pressure,outlet_pressure
     
     !local variables
     integer :: mesh_dof,depvar_types
@@ -87,12 +87,21 @@ if(diagnostics_level.GT.1)then
 endif
 
 if(bc_type.eq.'pressure')then
-    inletbc=15.0_dp*133.0_dp!2266.0_dp
-    outletbc=5.0_dp*133.0_dp!666.7_dp
+    if(inlet_pressure.EQ.0)then
+      inletbc=15.0_dp*133.0_dp!1995.0_dp !default inlet pressure for human
+    else
+      inletbc = inlet_pressure
+    endif   
 elseif(bc_type.eq.'flow')then
     inletbc=inlet_flow
-    outletbc=5.0_dp*133.0_dp!666.7_dp    
 endif
+
+if(outlet_pressure.EQ.0)then
+    outletbc=5.0_dp*133.0_dp!665.0_dp !default outlet pressure for human
+else
+    outletbc = outlet_pressure
+endif
+
 if(diagnostics_level.GT.1)then
 	print *, "inletbc=",inletbc
 	print *, "outletbc",outletbc
@@ -283,7 +292,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     real(dp):: viscosity
-	character(len=60) :: mesh_type
+    character(len=60) :: mesh_type
 !local variables
     integer :: ne,np1,np2
     real(dp) :: resistance,zeta

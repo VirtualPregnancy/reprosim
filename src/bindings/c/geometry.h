@@ -6,7 +6,7 @@
 
 SHO_PUBLIC void add_matching_mesh();
 SHO_PUBLIC void append_units();
-SHO_PUBLIC void calc_terminal_unit_length();
+SHO_PUBLIC void calc_capillary_unit_length();
 SHO_PUBLIC void define_1d_elements(const char *ELEMFILE);
 SHO_PUBLIC void define_node_geometry(const char *NODEFILE);
 SHO_PUBLIC void define_rad_from_geom(const char *ORDER_SYSTEM, double CONTROL_PARAM, const char *START_FROM,

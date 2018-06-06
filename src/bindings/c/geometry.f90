@@ -38,18 +38,18 @@ contains
 !
 !###################################################################################
 !
-!*calc_terminal_unit_length:* Calculates the effective length of terminal units
-  subroutine calc_terminal_unit_length_c() bind(C, name="calc_terminal_unit_length_c")
-    use geometry, only: calc_terminal_unit_length
+!*calc_capillary_unit_length:* Calculates the effective length of terminal units
+  subroutine calc_capillary_unit_length_c() bind(C, name="calc_capillary_unit_length_c")
+    use geometry, only: calc_capillary_unit_length
     implicit none
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_calc_terminal_unit_length
+    call so_calc_capillary_unit_length
 #else
-    call calc_terminal_unit_length
+    call calc_capillary_unit_length
 #endif
 
-  end subroutine calc_terminal_unit_length_c
+  end subroutine calc_capillary_unit_length_c
 !
 !###################################################################################
 !

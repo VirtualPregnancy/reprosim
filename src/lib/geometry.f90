@@ -14,7 +14,7 @@ module geometry
   private
   public add_matching_mesh
   public append_units
-  public calc_terminal_unit_length
+  public calc_capillary_unit_length
   public define_1d_elements
   public define_node_geometry
   public define_rad_from_geom
@@ -317,16 +317,16 @@ contains
 !
 !###################################################################################
 !
-  subroutine calc_terminal_unit_length()
-  !*Description:* Calculates the effective length of a terminal unit based on its total resistance
-  ! and radius. 
+  subroutine calc_capillary_unit_length()
+  !*Description:* Calculates the effective length of a capillary unit based on its total resistance
+  ! and assumed radius. 
     use arrays,only: dp, num_convolutes, num_generations,num_units,units,elem_field,elem_direction, &
                      node_xyz,elem_nodes,elem_cnct
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
     use indices, only: ne_length,ne_radius
     implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_TERMINAL_UNIT_LENGTH" :: CALC_TERMINAL_UNIT_LENGTH
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
 
     real(dp) :: int_length,int_radius,cap_length,cap_radius,seg_length,viscosity, &
                 seg_resistance,cap_resistance,terminal_resistance,total_resistance,cap_unit_radius
@@ -360,26 +360,19 @@ contains
     !calculate total resistance of terminal capillary conduits    
     int_length=1.5_dp !mm Length of each intermediate villous
     int_radius=0.030_dp/2  !0.0015; mm radius of each intermediate villous
-    print *,"int_radius=",int_radius
     cap_length=3_dp !mm length of capillary convolutes
     cap_radius=0.0144_dp/2 !radius of capillary convolutes
-    print *,"cap_radius=",cap_radius
     seg_length=int_length/num_convolutes !lengh of each intermediate villous segment
-    print *,"seg_length",seg_length
-    !viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
-    viscosity = 4e-3_dp
+    viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
 	
     seg_resistance=(8.d0*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
-    print *,"seg_resistance",seg_resistance
     cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
-    print *,"cap_resistance",cap_resistance
 
     i=1
     resistance(i)= cap_resistance + 2.d0*seg_resistance
     do i=2,num_convolutes+1
       resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1)) 
     enddo
-    print *, resistance
     terminal_resistance = resistance(num_convolutes+1) !Pa . s per mm^3 total resistance of terminal capillary conduits
 	
     !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
@@ -395,16 +388,14 @@ contains
     endif
 
     !calculate the effective length of each capillary unit based on its radius  
-    cap_unit_radius = 0.030_dp  
+    cap_unit_radius = 0.03_dp  
     do nu=1,num_units
       ne =units(nu) !Get a terminal unit
-      nc = elem_cnct(1,1,ne) !capillary unit is downstream of the terminal unit
-      print *, "nc=",nc
-      !udpate element radius
+      nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+      !update element radius
       elem_field(ne_radius,nc) = cap_unit_radius
       !update element length   
       elem_field(ne_length,nc) = total_resistance*(PI*elem_field(ne_radius,nc)**4)/(8.d0*viscosity)
-      print *,"nc effective length=",elem_field(ne_length,nc)
       !update element direction
       np1=elem_nodes(1,nc)
       np2=elem_nodes(2,nc)
@@ -416,7 +407,7 @@ contains
 
     call enter_exit(sub_name,2)
 
-  end subroutine calc_terminal_unit_length
+  end subroutine calc_capillary_unit_length
 !
 !###################################################################################
 !
