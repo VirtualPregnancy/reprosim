@@ -21,7 +21,6 @@ module geometry
   public element_connectivity_1d
   public evaluate_ordering
   public get_final_real
-  public set_capillary_values
 
 contains
 !
@@ -317,16 +316,19 @@ contains
 !
 !###################################################################################
 !
-  subroutine calc_capillary_unit_length()
+  subroutine calc_capillary_unit_length(num_convolutes,num_generations)
   !*Description:* Calculates the effective length of a capillary unit based on its total resistance
-  ! and assumed radius. 
-    use arrays,only: dp, num_convolutes, num_generations,num_units,units,elem_field,elem_direction, &
+  ! and assumed radius, given the number of terminal convolute connections and the number of
+  ! generations of symmetric intermediate villous trees 
+    use arrays,only: dp,num_units,units,elem_field,elem_direction, &
                      node_xyz,elem_nodes,elem_cnct
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
     use indices, only: ne_length,ne_radius
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
+
+    integer, intent(inout) :: num_convolutes,num_generations
 
     real(dp) :: int_length,int_radius,cap_length,cap_radius,seg_length,viscosity, &
                 seg_resistance,cap_resistance,terminal_resistance,total_resistance,cap_unit_radius
@@ -387,7 +389,7 @@ contains
       print *, "total_resistanc=",total_resistance	
     endif
 
-    !calculate the effective length of each capillary unit based on its radius  
+    !set the effective length of each capillary unit based the total resistance of capillary convolutes   
     cap_unit_radius = 0.03_dp  
     do nu=1,num_units
       ne =units(nu) !Get a terminal unit
@@ -1238,33 +1240,6 @@ contains
   end function inlist
 !
 !###########################################################################################
-!
-  subroutine set_capillary_values(convolutes,generations)
-  !*Description:* Sets the number of terminal convolute connections (num_convolutes) 
-  ! and the number of generations of symmetric intermediate villous trees (num_generations) 
-    use arrays,only: num_convolutes, num_generations
-    use diagnostics, only: enter_exit,get_diagnostics_level
-    implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SET_CAPILLARY_VALUES" :: SET_CAPILLARY_VALUES
-
-    integer, intent(in) :: convolutes,generations
-  
-    character(len=60) :: sub_name
-    integer:: diagnostics_level
-
-    sub_name = 'set_capillary_values'
-    call enter_exit(sub_name,1)
-    call get_diagnostics_level(diagnostics_level)
-
-    num_convolutes = convolutes
-    num_generations = generations
-
-    call enter_exit(sub_name,2)
-
-  end subroutine set_capillary_values
-
-!
-!###################################################################################
 !
 end module geometry
 
