@@ -51,9 +51,9 @@
       
     mesh_type = "full_plus_tube"
     bc_type = "flow"
-    inlet_flow = 37222.0_dp
+    inlet_flow = 111666.7_dp
     inlet_pressure = 0.0_dp
-    outlet_pressure = 0.0_dp
+    outlet_pressure = 2660.0_dp
     call evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_pressure)
       
     !populate test data
@@ -78,14 +78,15 @@
     implicit none
     real(dp),intent(out) :: elem_field(1,8) !(num_ne : num_elems)
     
-    elem_field(1,1) = 37222.0_dp 
-    elem_field(1,2) = 18610.995386202529_dp     
-    elem_field(1,3) = 18610.996355605486_dp     
-    elem_field(1,4) = 37222.065869929735_dp     
-    elem_field(1,5) = 18611.003644394979_dp     
-    elem_field(1,6) = 18610.996355605486_dp     
-    elem_field(1,7) = 18611.003644394979_dp     
-    elem_field(1,8) = 18610.996355605486_dp     
+    elem_field(1,1) = 111666.7_dp 
+    elem_field(1,2) = 55833.294838280883_dp     
+    elem_field(1,3) = 55833.306428283686_dp     
+    elem_field(1,4) = 111666.80201897584_dp     
+    elem_field(1,5) = 55833.393571716500_dp     
+    elem_field(1,6) = 55833.306428283686_dp     
+    elem_field(1,7) = 55833.393571716500_dp     
+    elem_field(1,8) = 55833.306428283686_dp 
+    
   end subroutine set_flow
 
   subroutine set_pressure(node_field)
@@ -93,14 +94,15 @@
     implicit none
     real(dp),intent(out) :: node_field(1,8) !(1 : num_nodes)
   
-    node_field(1,1) = 1994.9957997708334_dp     
-    node_field(1,2) = 1601.8123352900184_dp     
-    node_field(1,3) = 819.94399000956400_dp     
-    node_field(1,4) = 819.94398625789472_dp     
-    node_field(1,5) = 665.00000000000000_dp     
-    node_field(1,6) = 715.95663082640749_dp     
-    node_field(1,7) = 819.94398853896200_dp     
-    node_field(1,8) = 819.94439591820264_dp                                
+    node_field(1,1) = 6650.0037645709381_dp     
+    node_field(1,2) = 5470.4463792225870_dp     
+    node_field(1,3) = 3124.8349354185775_dp     
+    node_field(1,4) = 3124.8190499593911_dp     
+    node_field(1,5) = 2660.0000000000000_dp     
+    node_field(1,6) = 2812.8706292625357_dp     
+    node_field(1,7) = 3124.8349310067424_dp     
+    node_field(1,8) = 3124.8339425717932_dp 
+                               
   end subroutine set_pressure   
    
   subroutine set_terminal_solution(unit_field)
@@ -108,10 +110,11 @@
     implicit none
     real(dp),intent(out) :: unit_field(2,2) !(2 : num_units)
     !flow
-    unit_field(1,1) = 18610.995386202529_dp  
-    unit_field(1,2) = 18610.996355605486_dp 
+    unit_field(1,1) = 55833.294838280883_dp  
+    unit_field(1,2) = 55833.306428283686_dp 
     !pressure    
-    unit_field(2,1) = 819.94399000956400_dp   
-    unit_field(2,2) = 819.94398625789472_dp   
+    unit_field(2,1) = 3124.8349354185775_dp   
+    unit_field(2,2) = 3124.8190499593911_dp
+
   end subroutine set_terminal_solution            
                                   
