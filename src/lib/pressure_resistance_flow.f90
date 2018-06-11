@@ -88,7 +88,8 @@ endif
 
 if(bc_type.eq.'pressure')then
     if(inlet_pressure.EQ.0)then
-      inletbc=15.0_dp*133.0_dp!1995.0_dp !default inlet pressure for human
+      inletbc=6650.0_dp! Pa (50mmHg) default inlet pressure for human umbilical artery
+                       !1 mmHg = 133.322 pascals (Pa)
     else
       inletbc = inlet_pressure
     endif   
@@ -97,7 +98,7 @@ elseif(bc_type.eq.'flow')then
 endif
 
 if(outlet_pressure.EQ.0)then
-    outletbc=5.0_dp*133.0_dp!665.0_dp !default outlet pressure for human
+    outletbc=2660.0_dp! Pa (20mmHg) default outlet pressure for human umbilical vein
 else
     outletbc = outlet_pressure
 endif
