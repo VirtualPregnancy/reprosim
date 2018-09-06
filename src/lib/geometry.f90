@@ -17,6 +17,7 @@ module geometry
   public calc_capillary_unit_length
   public define_1d_elements
   public define_node_geometry
+  public define_rad_from_file
   public define_rad_from_geom
   public element_connectivity_1d
   public evaluate_ordering
@@ -659,6 +660,131 @@ contains
 !
 !###################################################################################
 !
+  subroutine define_rad_from_file(FIELDFILE, radius_type_in)
+  !*Description:* Reads in a radius field associated with a vascular tree
+  ! and assigns radius information to each element, also calculates volume of each
+  ! element
+    use arrays,only: dp,elem_field,elem_cnct,elem_nodes,&
+         elems_at_node,num_elems,num_nodes,node_field
+    use indices,only: ne_a_A,ne_length,ne_radius,ne_vol,&
+      ne_radius_in,ne_radius_out
+
+    use diagnostics, only: enter_exit
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_RAD_FROM_FILE" :: DEFINE_RAD_FROM_FILE
+
+    character(len=MAX_FILENAME_LEN), intent(in) :: FIELDFILE
+    character(len=MAX_STRING_LEN), optional ::  radius_type_in
+    !     Local Variables
+    integer :: ierror,ne,np,np1,np2,np_global,surround
+    character(len=MAX_STRING_LEN) ::  radius_type
+    character(LEN=132) :: ctemp1
+    LOGICAL :: versions
+    real(dp) :: radius
+    character(len=60) :: sub_name
+
+    sub_name = 'define_rad_from_file'
+    call enter_exit(sub_name,1)
+    
+    versions = .TRUE.
+    if(present(radius_type_in))then
+      radius_type = radius_type_in
+    else
+      radius_type = 'no_taper'
+    endif
+
+    open(10, file=FIELDFILE, status='old')
+
+    !.....check whether versions are prompted (>1)
+    read_versions : do !define a do loop name
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1 !read a line into ctemp1
+       if(index(ctemp1, "different")> 0) then !keyword "different" is found
+          if(index(ctemp1, " N")> 0) then !keyword " N" is found
+             versions=.false.
+          endif
+          exit read_versions !exit the named do loop
+       endif
+    end do read_versions
+
+    np = 0
+    !.....read the coordinate, derivative, and version information for each node.
+    read_a_node : do !define a do loop name
+       !.......read node number
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+       if(index(ctemp1, "Node")> 0) then
+          call get_final_integer(ctemp1,np_global) !get global node number
+          ! find the corresponding local node number
+          call get_local_node(np_global,np) ! get local node np for global node
+          surround=elems_at_node(np,0)         !get number of surrounding elems
+          ne=elems_at_node(np,1)  !First element at this node
+          if(surround==1)then !only one element at this node so either a terminal or inlet
+             if(radius_type.eq.'taper')then !inlet radius needs to be defined
+               if(elem_cnct(-1,0,ne).eq.0)then!Inlet as it has no parent need to set up radius into this vessel
+                 read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+                 read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+                 if(index(ctemp1, "version number")>0) then
+                    read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+                 endif
+                 if(index(ctemp1, "value")> 0) then
+                    call get_final_real(ctemp1,radius)
+                    elem_field(ne_radius_in,ne)=radius
+                 endif
+               endif
+             endif
+             if(elem_cnct(-1,0,ne).eq.0)cycle      !No parent therefore inlet. Skip and go to the next
+             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+             if(index(ctemp1, "version number")>0) then
+                read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+             endif
+             if(index(ctemp1, "value")> 0) then
+                call get_final_real(ctemp1,radius)
+                 if(radius_type.eq.'taper')then
+                   elem_field(ne_radius_out,ne)=radius
+                 else
+                  elem_field(ne_radius,ne)=radius
+                 endif
+             endif
+          elseif(surround.gt.1)then !Terminal element - use first radius
+             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+             if(index(ctemp1, "value")> 0) then
+                call get_final_real(ctemp1,radius)
+                  if(radius_type.eq.'taper')then
+                    elem_field(ne_radius_out,ne)=radius
+                  else
+                    elem_field(ne_radius,ne)=radius
+                  endif
+             endif
+          endif
+       endif !index
+       if(np.ge.num_nodes) exit read_a_node
+    end do read_a_node
+
+    ! calculate the element volumes
+    do ne=1,num_elems
+       if(radius_type.eq.'taper')then
+         if(elem_cnct(-1,0,ne).ne.0)then !radius in is radius of upstream vessel
+            elem_field(ne_radius_in,ne)=elem_field(ne_radius_out,elem_cnct(-1,1,ne))
+         endif
+         elem_field(ne_radius,ne)=(elem_field(ne_radius_in,ne)+elem_field(ne_radius_out,ne))/2
+       endif
+       !       ne_global=elems(noelem)
+       np1=elem_nodes(1,ne)
+       np2=elem_nodes(2,ne)
+       ! element volume
+       elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
+            elem_field(ne_length,ne)
+       elem_field(ne_a_A,ne) = 1.0_dp ! set default for ratio a/A
+    enddo
+    call enter_exit(sub_name,2)
+
+  END subroutine define_rad_from_file
+!
+!##################################################################################
+!
+
   subroutine define_rad_from_geom(ORDER_SYSTEM, CONTROL_PARAM, START_FROM, START_RAD, group_type_in, group_option_in)
   !*Description:* Defines vessel radius based on their geometric structure
     use arrays,only: dp,num_elems,elem_field,elem_ordrs,maxgen,elem_cnct,num_arterial_elems
