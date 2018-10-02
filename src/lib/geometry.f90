@@ -27,111 +27,347 @@ contains
 !
 !###################################################################################
 !
-  subroutine add_matching_mesh()
+  subroutine add_matching_mesh(umbilical_elem_option_in)
   !*Description:* adds a matching venous mesh to an arterial mesh
     use arrays,only: dp,elems,elem_cnct,elem_direction,elem_field,&
          elem_nodes,elem_ordrs,elem_symmetry,elems_at_node,&
          nodes,node_xyz,num_elems,&
          num_nodes,num_units,units,num_arterial_elems
     use indices
-    use other_consts,only: PI
+    use other_consts,only: PI,MAX_STRING_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ADD_MATCHING_MESH" :: ADD_MATCHING_MESH  
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ADD_MATCHING_MESH" :: ADD_MATCHING_MESH 
+    character(len=MAX_STRING_LEN), optional ::  umbilical_elem_option_in 
     !Parameters to become inputs
     real(dp) :: offset(3)
     logical :: REVERSE=.TRUE.
     !local variables
-    integer :: num_nodes_new,num_elems_new,ne,ne_global,np,np_global,np0,nonode,np_m
-    integer :: nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter,i,j
+    integer :: num_nodes_new,num_elems_new,ne,ne_global,np,np_global,np0,nonode,np_m, &
+            inlet, downstream_elem, node_counter, elem_counter, indx, elem_at_node, indx2, &
+            umb_elem_counter, umb_node_counter, &
+            nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter,i,j, &
+            ne_indx, max_ne, max_elem_indx
     integer, allocatable :: np_map(:)
+    integer, allocatable :: ne_map(:)
+    character(len=MAX_STRING_LEN) ::  umbilical_elem_option
+    integer :: new_umb_elems(4) = 0
+    integer :: new_umb_nodes(5) = 0
+    integer :: umb_art_nodes(6) = 0
+    integer :: umb_art_elems(5) = 0
+    integer :: copy_nodes(4) = 0
+    INTEGER, DIMENSION(4) :: umb_node_indx = (/ 1, 2, 5, 6 /) 
+
     character(len=60) :: sub_name
     integer :: diagnostics_level
 
     sub_name = 'add_matching_mesh'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
+    
+    if(present(umbilical_elem_option_in))then
+      umbilical_elem_option = umbilical_elem_option_in
+    else
+      umbilical_elem_option = 'same_as_arterial'
+    endif
+
     !Ultimately offset should be an input argument
     offset(1)=0.0_dp
     offset(2)=1e-6_dp
     offset(3)=0.0_dp
 
+    if(umbilical_elem_option.EQ.'same_as_arterial')then
+
+       ! the number of nodes after adding mesh will be:
+       num_nodes_new = 2*num_nodes
+       ! the number of elems after adding mesh will be:
+       num_elems_new = 2*num_elems + num_units
+
+    elseif(umbilical_elem_option.EQ.'single_umbilical_vein')then
+
+       !find the inlet
+       ne = 1
+       inlet = 0
+       do while((noelem.LE.num_elems).AND.(inlet.EQ.0))
+	if(elem_cnct(-1,0,ne).EQ.0)then
+	   inlet = ne !no upstream elements so this is the inlet element
+	endif
+	ne = ne + 1
+       enddo
+
+       if(inlet.EQ.0)then
+          print *,"inlet not found"
+	  call exit(1)
+       endif
+
+       ! the number of nodes after adding mesh will be:
+       num_nodes_new = 2*num_nodes - 1 !there are 5 umbilical artery nodes and only 4 ubmilical vein nodes
+       ! the number of elems after adding mesh will be:
+       num_elems_new = 2*num_elems + num_units - 1 !there are 4 umbilical artery elements and only 
+                                                   !3 umbilical vein nodes 
+       !get elements downstream of inlet and elements downstream of those (4 elements altogether)
+       !a new venous node will be added at the centre of mass between copies of the last umbilical artery nodes
+       !new umbilical vein elements will be created between the second node of the inlet and the new node,
+       !and between the new node and copies of the last umbilical artery nodes
+
+       umb_art_elems(1) = inlet
+       umb_art_nodes(1) = elem_nodes(1,inlet)
+       umb_art_nodes(2) = elem_nodes(2,inlet)
+       
+       umb_elem_counter = 2
+       umb_node_counter = 3
+       do n=1,2
+          downstream_elem = elem_cnct(1,n,inlet)
+	  umb_art_elems(umb_elem_counter) = downstream_elem
+          umb_elem_counter = umb_elem_counter + 1
+          umb_art_nodes(umb_node_counter) = elem_nodes(2,downstream_elem)
+          umb_node_counter = umb_node_counter + 1
+       enddo 
+
+       do n=2,3
+          downstream_elem = elem_cnct(1,1,umb_art_elems(n))
+          umb_art_elems(umb_elem_counter) = downstream_elem
+          umb_elem_counter = umb_elem_counter + 1 
+          umb_art_nodes(umb_node_counter) = elem_nodes(2,downstream_elem)
+          umb_node_counter = umb_node_counter + 1
+       enddo
+       copy_nodes = umb_art_nodes(umb_node_indx)
+    endif
 
     allocate(np_map(num_nodes))
-!!! increase the size of node and element arrays to accommodate the additional elements
-    ! the number of nodes after adding mesh will be:
-    num_nodes_new = 2*num_nodes
-    ! the number of elems after adding mesh will be:
-    num_elems_new = 2*num_elems + num_units
-  
+    np_map = 0
+    allocate(ne_map(num_elems))
+    ne_map = 0
+    !!! increase the size of node and element arrays to accommodate the additional elements
+ 
     call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
-    noelem0=0
     ne0 = num_elems ! the starting local element number
     ne_global = elems(ne0) ! assumes this is the highest element number (!!!)
     np0 = num_nodes ! the starting local node number
     np_global = nodes(np0) ! assumes this is the highest node number (!!!)
-
-    do nonode=1,num_nodes
-       np=np_global+nonode
-       np_m=nodes(nonode)
-       np_map(np_m)=np !maps new to old node numbering
-       nodes(np0+nonode)=np
-       do nj=1,3
-         node_xyz(nj,np)=node_xyz(nj,np_m)+offset(nj)
-       enddo
-       elems_at_node(np,0)=0 !initialise
-     !Doesnt map versions, would be added here
-    enddo
     
+    if(umbilical_elem_option.NE.'same_as_arterial')then
+       node_counter = 1
+
+       !create the umbilical vein nodes
+       do indx=1,4
+          np=np_global+node_counter
+          new_umb_nodes(indx) = np
+          nonode = copy_nodes(indx)
+          np_m=nodes(nonode)
+          np_map(np_m)=np !maps new to old node numbering
+          nodes(np0+node_counter)=np
+          do nj=1,3
+             node_xyz(nj,np)=node_xyz(nj,np_m)+offset(nj)
+          enddo
+          node_counter = node_counter + 1  
+       enddo
+
+       !create an extra node for umbilical vein elements inbetween copies of 
+       !the last umbilical artery nodes
+       !get the centre of mass between the two nodes
+       np=np_global+node_counter
+       new_umb_nodes(5) = np
+       nodes(np0+node_counter)=np   
+       node_xyz(1,np)=(node_xyz(1,new_umb_nodes(3))+node_xyz(1,new_umb_nodes(4)))/2
+       node_xyz(2,np)=(node_xyz(2,new_umb_nodes(3))+node_xyz(2,new_umb_nodes(4)))/2
+       node_xyz(3,np)=(node_xyz(3,new_umb_nodes(3))+node_xyz(3,new_umb_nodes(4)))/2
+       node_counter = node_counter + 1
+
+       do nonode=1,num_nodes
+          if(ALL(umb_art_nodes.NE.nonode))then
+             np=np_global+node_counter
+             np_m=nodes(nonode)
+             np_map(np_m)=np !maps new to old node numbering
+             nodes(np0+node_counter)=np
+             do nj=1,3
+               node_xyz(nj,np)=node_xyz(nj,np_m)+offset(nj)
+             enddo
+             node_counter = node_counter + 1          
+          endif
+       enddo
+       
+    else !umbilical_elem_option
+
+       do nonode=1,num_nodes
+          np=np_global+nonode
+          np_m=nodes(nonode)
+          np_map(np_m)=np !maps new to old node numbering
+          nodes(np0+nonode)=np
+          do nj=1,3
+            node_xyz(nj,np)=node_xyz(nj,np_m)+offset(nj)
+          enddo
+        !Doesnt map versions, would be added here
+       enddo
+
+    endif !umbilical_elem_option
+
+    elems_at_node(np,0)=0 !initialise
+
+    elem_counter = 1
+
+    if(umbilical_elem_option.NE.'same_as_arterial')then
+       !copy the inlet element
+       ne=ne_global+elem_counter
+       new_umb_elems(1)=ne
+       elem_field(ne_group,ne)=2.0_dp!VEIN
+       elems(ne0+elem_counter)=ne
+       elem_nodes(1,ne)=new_umb_nodes(2)
+       elem_nodes(2,ne)=new_umb_nodes(1)
+       elem_counter = elem_counter + 1
+
+       !create an element connecting the newly created node and the first node of the inlet and 
+       ne=ne_global+elem_counter
+       new_umb_elems(2)=ne
+       elem_field(ne_group,ne)=2.0_dp!VEIN
+       elems(ne0+elem_counter)=ne
+       elem_nodes(1,ne)=new_umb_nodes(5)
+       elem_nodes(2,ne)=new_umb_nodes(2)
+       elem_counter = elem_counter + 1
+       !create two elements connecting the first nodes of the last two umbilical elements
+       !and the newly created node
+       ne=ne_global+elem_counter
+       new_umb_elems(3)=ne
+       elem_field(ne_group,ne)=2.0_dp!VEIN
+       elems(ne0+elem_counter)=ne
+       elem_nodes(1,ne)=new_umb_nodes(3)
+       elem_nodes(2,ne)=new_umb_nodes(5)
+       elem_counter = elem_counter + 1
+
+       ne=ne_global+elem_counter
+       new_umb_elems(4)=ne
+       elem_field(ne_group,ne)=2.0_dp!VEIN
+       elems(ne0+elem_counter)=ne
+       elem_nodes(1,ne)=new_umb_nodes(4)
+       elem_nodes(2,ne)=new_umb_nodes(5)
+       elem_counter = elem_counter + 1
+    
+       !populate elements at a node for the new umbilical elements
+       do indx=1,4
+          noelem=new_umb_elems(indx)
+          elems_at_node(elem_nodes(1,noelem),0)=elems_at_node(elem_nodes(1,noelem),0)+1
+          elems_at_node(elem_nodes(1,noelem),elems_at_node(elem_nodes(1,noelem),0))=noelem
+          elems_at_node(elem_nodes(2,noelem),0)=elems_at_node(elem_nodes(2,noelem),0)+1
+          elems_at_node(elem_nodes(2,noelem),elems_at_node(elem_nodes(2,noelem),0))=noelem
+        enddo
+    endif
+          
     do noelem=1,num_elems
-        ne=ne_global+noelem
-        elem_field(ne_group,ne)=2.0_dp!VEIN
         ne_m=elems(noelem)
         elem_field(ne_group,ne_m)=0.0_dp!ARTERY
-        elems(ne0+noelem)=ne
-        if(.NOT.REVERSE)then
-          elem_nodes(1,ne)=np_map(elem_nodes(1,ne_m))
-          elem_nodes(2,ne)=np_map(elem_nodes(2,ne_m))
-          elem_cnct(1,0,ne)=elem_cnct(1,0,ne_m)
-          elem_cnct(-1,0,ne)=elem_cnct(-1,0,ne_m)
-          do n=1,elem_cnct(1,0,ne)
-            elem_cnct(1,n,ne)=elem_cnct(1,n,ne_m)+ne0
-          enddo
-          do n=1,elem_cnct(-1,0,ne)
-            elem_cnct(-1,n,ne)=elem_cnct(-1,n,ne_m)+ne0
-          enddo
-        else
-          elem_nodes(1,ne)=np_map(elem_nodes(2,ne_m))
-          elem_nodes(2,ne)=np_map(elem_nodes(1,ne_m))
-          elem_cnct(-1,0,ne)=elem_cnct(1,0,ne_m)
-          elem_cnct(1,0,ne)=elem_cnct(-1,0,ne_m)
-          do n=1,elem_cnct(-1,0,ne)        
-            elem_cnct(-1,n,ne)=elem_cnct(1,n,ne_m)+ne0
-          enddo
-          do n=1,elem_cnct(1,0,ne)
-            elem_cnct(1,n,ne)=elem_cnct(-1,n,ne_m)+ne0
-          enddo
-        endif
-        !if worrying about regions and versions do it here
-        elems_at_node(elem_nodes(1,ne),0)=elems_at_node(elem_nodes(1,ne),0)+1
-        elems_at_node(elem_nodes(1,ne),elems_at_node(elem_nodes(1,ne),0))=ne
-        elems_at_node(elem_nodes(2,ne),0)=elems_at_node(elem_nodes(2,ne),0)+1
-        elems_at_node(elem_nodes(2,ne),elems_at_node(elem_nodes(2,ne),0))=ne
-        nindex=no_gen
-        elem_ordrs(nindex,ne)=elem_ordrs(nindex,ne_m)
-        nindex=no_sord
-        elem_ordrs(nindex,ne)=elem_ordrs(nindex,ne_m)
-        nindex=no_hord
-        elem_ordrs(nindex,ne)=elem_ordrs(nindex,ne_m)
-      enddo
+        if((umbilical_elem_option.EQ.'same_as_arterial').OR. &
+                    ((umbilical_elem_option.NE.'same_as_arterial').AND.(ALL(umb_art_elems.NE.noelem))))then
+           ne=ne_global+elem_counter
+           elem_field(ne_group,ne)=2.0_dp!VEIN
+           elems(ne0+elem_counter)=ne
+           ne_map(ne_m)=ne !maps new to old element numbering
+           elem_nodes(1,ne)=np_map(elem_nodes(2,ne_m))
+           elem_nodes(2,ne)=np_map(elem_nodes(1,ne_m))   
+           !if worrying about regions and versions do it here
+           elems_at_node(elem_nodes(1,ne),0)=elems_at_node(elem_nodes(1,ne),0)+1
+           elems_at_node(elem_nodes(1,ne),elems_at_node(elem_nodes(1,ne),0))=ne
+           elems_at_node(elem_nodes(2,ne),0)=elems_at_node(elem_nodes(2,ne),0)+1
+           elems_at_node(elem_nodes(2,ne),elems_at_node(elem_nodes(2,ne),0))=ne
+           
+           nindex=no_gen
+           elem_ordrs(nindex,ne)=elem_ordrs(nindex,ne_m)
+           nindex=no_sord
+           elem_ordrs(nindex,ne)=elem_ordrs(nindex,ne_m)
+           nindex=no_hord
+           elem_ordrs(nindex,ne)=elem_ordrs(nindex,ne_m)
 
-     !update current no of nodes and elements to determine connectivity
-     np0=np !current highest node
-     ne1=ne !current highest element
-     noelem0=num_elems+noelem0
+           elem_counter = elem_counter + 1
+        endif
+    enddo   
+    max_ne = ne
+    max_elem_indx = ne0 + elem_counter - 1
+
+    !copy element connectivity
+    do noelem=1,num_elems      
+           ne_m=elems(noelem)
+           ne=ne_map(ne_m)
+           if(ne.GT.0)then             
+              elem_cnct(-1,0,ne)=elem_cnct(1,0,ne_m)
+              elem_cnct(1,0,ne)=elem_cnct(-1,0,ne_m)
+              do n=1,elem_cnct(-1,0,ne)     
+                elem_cnct(-1,n,ne)=ne_map(elem_cnct(1,n,ne_m))
+              enddo
+              do n=1,elem_cnct(1,0,ne) 
+                elem_cnct(1,n,ne)=ne_map(elem_cnct(-1,n,ne_m))
+              enddo    
+           endif   
+    enddo
+
+    if(umbilical_elem_option.NE.'same_as_arterial')then
+
+        !populate element connectivity for the new umbilical venous elements
+        elem_cnct(-1,0,new_umb_elems(1)) = 1
+	elem_cnct(-1,1,new_umb_elems(1)) = new_umb_elems(2)
+        elem_cnct(1,0,new_umb_elems(1)) = 0
+
+        elem_cnct(-1,0,new_umb_elems(2)) = 2
+        elem_cnct(-1,1,new_umb_elems(2)) = new_umb_elems(3)
+        elem_cnct(-1,2,new_umb_elems(2)) = new_umb_elems(4)
+        elem_cnct(1,0,new_umb_elems(2)) = 1
+        elem_cnct(1,1,new_umb_elems(2)) = new_umb_elems(1)
+
+        elem_cnct(1,0,new_umb_elems(3)) = 1
+        elem_cnct(1,1,new_umb_elems(3)) = new_umb_elems(2)
+
+        elem_cnct(1,0,new_umb_elems(4)) = 1
+        elem_cnct(1,1,new_umb_elems(4)) = new_umb_elems(2)
+
+        !fix element connectivity for elements upstream of new umbilical venous elements  
+        do indx=3,4
+           noelem = new_umb_elems(indx)
+           nonode = elem_nodes(1,noelem) !get the first node
+	   !get elements connected to the first node
+           do indx2=1,elems_at_node(nonode,0)
+	      elem_at_node = elems_at_node(nonode,indx2)
+              !populate downstream element
+              if(elem_at_node.NE.noelem)then
+                 elem_cnct(1,0,elem_at_node)=1
+	         elem_cnct(1,1,elem_at_node)=noelem
+
+                 elem_cnct(-1,0,noelem)=elem_cnct(-1,0,noelem)+1
+                 elem_cnct(-1,elem_cnct(-1,0,noelem),noelem)=elem_at_node
+              endif	
+	   enddo
+        enddo
+
+        !element orders for the first new element - the same as the arterial inlet
+        nindex=no_gen
+        elem_ordrs(nindex,new_umb_elems(1))=elem_ordrs(nindex,inlet)
+        nindex=no_sord
+        elem_ordrs(nindex,new_umb_elems(1))=elem_ordrs(nindex,inlet)
+        nindex=no_hord
+        elem_ordrs(nindex,new_umb_elems(1))=elem_ordrs(nindex,inlet)
+
+        !element orders for the second new element - the same as the arterial inlet
+        nindex=no_gen
+        elem_ordrs(nindex,new_umb_elems(2))=elem_ordrs(nindex,inlet)
+        nindex=no_sord
+        elem_ordrs(nindex,new_umb_elems(2))=elem_ordrs(nindex,inlet)
+        nindex=no_hord
+        elem_ordrs(nindex,new_umb_elems(2))=elem_ordrs(nindex,inlet)
+
+        !element orders for the last two new elements - the same as the second
+        !element in umb_art_elems
+        do indx=3,4
+           nindex=no_gen
+           elem_ordrs(nindex,new_umb_elems(indx))=elem_ordrs(nindex,umb_art_elems(2))
+           nindex=no_sord
+           elem_ordrs(nindex,new_umb_elems(indx))=elem_ordrs(nindex,umb_art_elems(2))
+           nindex=no_hord
+           elem_ordrs(nindex,new_umb_elems(indx))=elem_ordrs(nindex,umb_art_elems(2))
+        enddo
+
+     endif !umbilical_elem_option
 
      cap_conns=0
      cap_term=0
+     noelem0 = max_elem_indx
+     ne1 = max_ne
      do nu=1,num_units
          ne=units(nu)
          cap_term=cap_term+1
@@ -146,14 +382,16 @@ contains
          elems_at_node(np1,elems_at_node(np1,0))=ne1
          elems_at_node(np2,0)=elems_at_node(np2,0)+1
          elems_at_node(np2,elems_at_node(np2,0))=ne1
-         elem_cnct(1,elem_cnct(1,0,ne)+1,ne)=ne1
-         elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1
-         elem_cnct(-1,elem_cnct(-1,0,ne+ne_global)+1,ne+ne_global)=ne1
-         elem_cnct(-1,0,ne+ne_global)=elem_cnct(-1,0,ne+ne_global)+1
+         elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1 
+         elem_cnct(1,elem_cnct(1,0,ne),ne)=ne1       
+         ne_m=elems(ne)
+         elem_cnct(-1,0,ne_map(ne_m))=elem_cnct(-1,0,ne_map(ne_m))+1
+         elem_cnct(-1,elem_cnct(-1,0,ne_map(ne_m)),ne_map(ne_m))=ne1
+         
          elem_cnct(-1,0,ne1)=1
          elem_cnct(1,0,ne1)=1
          elem_cnct(-1,1,ne1)=ne
-         elem_cnct(1,1,ne1)=ne+ne0
+         elem_cnct(1,1,ne1)=ne_map(ne_m)
          nindex=no_gen
          elem_ordrs(nindex,ne1)=elem_ordrs(nindex,ne_m)
          nindex=no_sord
@@ -238,7 +476,6 @@ contains
     		  		print *, "elem_ordrs(",counter,",",ne,")=",elem_ordrs(counter,ne)
     			ENDDO
     		enddo
-    		print *, elem_ordrs
     		 
     endif !diagnostics_level
        
@@ -250,7 +487,7 @@ contains
 !###################################################################################
 !
   subroutine append_units()
-  !*Description:* Appends terminal units at the end of a tree structure
+  !*Description:* Defines terminal units at the end of a tree structure
     use arrays,only: dp, elem_cnct,elem_symmetry,elem_units_below,&
          num_elems,num_units,units,unit_field
     use indices,only: num_nu
@@ -660,42 +897,47 @@ contains
 !
 !###################################################################################
 !
-  subroutine define_rad_from_file(FIELDFILE, radius_type_in)
+  subroutine define_rad_from_file(FIELDFILE,venous_option_in)
   !*Description:* Reads in a radius field associated with a vascular tree
   ! and assigns radius information to each element, also calculates volume of each
   ! element
     use arrays,only: dp,elem_field,elem_cnct,elem_nodes,&
-         elems_at_node,num_elems,num_nodes,node_field
-    use indices,only: ne_a_A,ne_length,ne_radius,ne_vol,&
-      ne_radius_in,ne_radius_out
-
-    use diagnostics, only: enter_exit
+         elems_at_node,num_elems,num_nodes
+    use indices,only: ne_length,ne_radius
+    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
+    use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_RAD_FROM_FILE" :: DEFINE_RAD_FROM_FILE
 
     character(len=MAX_FILENAME_LEN), intent(in) :: FIELDFILE
-    character(len=MAX_STRING_LEN), optional ::  radius_type_in
+    character(len=MAX_STRING_LEN), optional ::  venous_option_in
     !     Local Variables
+    real(dp) :: node_radius(num_nodes)
     integer :: ierror,ne,np,np1,np2,np_global,surround
-    character(len=MAX_STRING_LEN) ::  radius_type
     character(LEN=132) :: ctemp1
     LOGICAL :: versions
     real(dp) :: radius
+    character(len=MAX_STRING_LEN) ::  venous_option
     character(len=60) :: sub_name
+    integer :: diagnostics_level
 
     sub_name = 'define_rad_from_file'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
     
     versions = .TRUE.
-    if(present(radius_type_in))then
-      radius_type = radius_type_in
+
+
+    if(present(venous_option_in))then
+      venous_option = venous_option_in
     else
-      radius_type = 'no_taper'
+      venous_option = 'no_venous_radii'
     endif
+
 
     open(10, file=FIELDFILE, status='old')
 
-    !.....check whether versions are prompted (>1)
+    !.....check whether versions are prompted (>1) - versions are not used later in this subroutine
     read_versions : do !define a do loop name
        read(unit=10, fmt="(a)", iostat=ierror) ctemp1 !read a line into ctemp1
        if(index(ctemp1, "different")> 0) then !keyword "different" is found
@@ -715,48 +957,11 @@ contains
           call get_final_integer(ctemp1,np_global) !get global node number
           ! find the corresponding local node number
           call get_local_node(np_global,np) ! get local node np for global node
-          surround=elems_at_node(np,0)         !get number of surrounding elems
-          ne=elems_at_node(np,1)  !First element at this node
-          if(surround==1)then !only one element at this node so either a terminal or inlet
-             if(radius_type.eq.'taper')then !inlet radius needs to be defined
-               if(elem_cnct(-1,0,ne).eq.0)then!Inlet as it has no parent need to set up radius into this vessel
-                 read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-                 read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-                 if(index(ctemp1, "version number")>0) then
-                    read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-                 endif
-                 if(index(ctemp1, "value")> 0) then
-                    call get_final_real(ctemp1,radius)
-                    elem_field(ne_radius_in,ne)=radius
-                 endif
-               endif
-             endif
-             if(elem_cnct(-1,0,ne).eq.0)cycle      !No parent therefore inlet. Skip and go to the next
-             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-             if(index(ctemp1, "version number")>0) then
-                read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-             endif
-             if(index(ctemp1, "value")> 0) then
+          read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+          read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+    	  if(index(ctemp1, "value")> 0) then
                 call get_final_real(ctemp1,radius)
-                 if(radius_type.eq.'taper')then
-                   elem_field(ne_radius_out,ne)=radius
-                 else
-                  elem_field(ne_radius,ne)=radius
-                 endif
-             endif
-          elseif(surround.gt.1)then !Terminal element - use first radius
-             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-             if(index(ctemp1, "value")> 0) then
-                call get_final_real(ctemp1,radius)
-                  if(radius_type.eq.'taper')then
-                    elem_field(ne_radius_out,ne)=radius
-                  else
-                    elem_field(ne_radius,ne)=radius
-                  endif
-             endif
+                node_radius(np)=radius   
           endif
        endif !index
        if(np.ge.num_nodes) exit read_a_node
@@ -764,20 +969,17 @@ contains
 
     ! calculate the element volumes
     do ne=1,num_elems
-       if(radius_type.eq.'taper')then
-         if(elem_cnct(-1,0,ne).ne.0)then !radius in is radius of upstream vessel
-            elem_field(ne_radius_in,ne)=elem_field(ne_radius_out,elem_cnct(-1,1,ne))
-         endif
-         elem_field(ne_radius,ne)=(elem_field(ne_radius_in,ne)+elem_field(ne_radius_out,ne))/2
-       endif
-       !       ne_global=elems(noelem)
-       np1=elem_nodes(1,ne)
+       !for each element set the element radius to the radius of the second node
        np2=elem_nodes(2,ne)
-       ! element volume
-       elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
-            elem_field(ne_length,ne)
-       elem_field(ne_a_A,ne) = 1.0_dp ! set default for ratio a/A
+       elem_field(ne_radius,ne) = node_radius(np2)
     enddo
+
+    if(diagnostics_level.GT.1)then
+        do ne=1,num_elems
+     	   print *,"radius for element",ne,"=",elem_field(ne_radius,ne)
+        enddo
+     endif
+
     call enter_exit(sub_name,2)
 
   END subroutine define_rad_from_file
@@ -880,6 +1082,7 @@ contains
      elem_field(ne_radius_in,ne)=radius
      elem_field(ne_radius_out,ne)=radius
      if(diagnostics_level.GT.1)then
+	print *,"element order for element",ne,"=",elem_ordrs(nindex,ne)
      	print *,"radius for element",ne,"=",elem_field(ne_radius,ne)
      	print *,"radius in for element",ne,"=",elem_field(ne_radius_in,ne)
      	print *,"radius out for element",ne,"=",elem_field(ne_radius_out,ne)
@@ -1017,7 +1220,7 @@ contains
 
     integer :: INLETS,ne,ne0,ne2,noelem2,np,np2, &
          num_attach,n_children,n_generation, &
-         n_horsfield,OUTLETS,STRAHLER,STRAHLER_ADD,temp1
+         n_horsfield,OUTLETS,STRAHLER,STRAHLER_ADD,temp1, counter
     LOGICAL :: DISCONNECT,DUPLICATE
     character(len=60) :: sub_name
     integer :: diagnostics_level
@@ -1029,7 +1232,7 @@ contains
     !Calculate generations, Horsfield orders, Strahler orders
     !.....Calculate branch generations
 
-	elem_ordrs = 0
+    elem_ordrs = 0
     maxgen=1
     DO ne=1,num_elems
        ne0=elem_cnct(-1,1,ne) !parent
@@ -1044,6 +1247,7 @@ contains
           elem_ordrs(1,ne)=1 !generation 1
        ENDIF
        maxgen=max(maxgen,elem_ordrs(1,ne))
+
     ENDDO !noelem
 	if(diagnostics_level.GT.1)then
 		print *,"branch generations - maxgen",maxgen
@@ -1107,6 +1311,15 @@ contains
        ENDIF
     ENDDO
   
+
+    if(diagnostics_level.GT.1)then 
+       do ne=1,num_elems
+          do counter=1,3		
+             print *, "elem_ordrs(",counter,",",ne,")=",elem_ordrs(counter,ne)
+    	  enddo
+       enddo	  
+    endif
+
     call enter_exit(sub_name,2)
 
   end subroutine evaluate_ordering

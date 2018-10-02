@@ -7,14 +7,24 @@ contains
 !###################################################################################
 !
 !*add_matching_mesh:* Replicates an existing mesh, continuing node and element numbers
-  subroutine add_matching_mesh_c() bind(C, name="add_matching_mesh_c")
+  subroutine add_matching_mesh_c(umbilical_elem_option, umbilical_elem_option_len) &
+        bind(C, name="add_matching_mesh_c")
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_STRING_LEN
     use geometry, only: add_matching_mesh
     implicit none
 
+    integer,intent(in) :: umbilical_elem_option_len
+    type(c_ptr), value, intent(in) :: umbilical_elem_option
+    character(len=MAX_STRING_LEN) :: umbilical_elem_option_f
+
+    call strncpy(umbilical_elem_option_f, umbilical_elem_option, umbilical_elem_option_len)
+
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_add_matching_mesh
+    call so_add_matching_mesh(umbilical_elem_option_f)
 #else
-    call add_matching_mesh
+    call add_matching_mesh(umbilical_elem_option_f)
 #endif
 
   end subroutine add_matching_mesh_c
@@ -39,7 +49,8 @@ contains
 !###################################################################################
 !
 !*calc_capillary_unit_length:* Calculates the effective length of terminal units
-  subroutine calc_capillary_unit_length_c(num_convolutes,num_generations) bind(C, name="calc_capillary_unit_length_c")
+  subroutine calc_capillary_unit_length_c(num_convolutes,num_generations) &
+      bind(C, name="calc_capillary_unit_length_c")
     use geometry, only: calc_capillary_unit_length
     implicit none
 
@@ -104,7 +115,8 @@ contains
 !
 !###################################################################################
 !
-  subroutine define_rad_from_file_c(FIELDFILE, filename_len, radius_type, radius_type_len) bind(C, name="define_rad_from_file_c")
+  subroutine define_rad_from_file_c(FIELDFILE, filename_len, venous_option, venous_option_len) &
+          bind(C, name="define_rad_from_file_c")
 
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
@@ -112,17 +124,18 @@ contains
     use geometry, only: define_rad_from_file
     implicit none
 
-    integer,intent(in) :: filename_len, radius_type_len
-    type(c_ptr), value, intent(in) :: FIELDFILE, radius_type
-    character(len=MAX_FILENAME_LEN) :: filename_f, radius_type_f
+    integer,intent(in) :: filename_len, venous_option_len
+    type(c_ptr), value, intent(in) :: FIELDFILE, venous_option
+    character(len=MAX_FILENAME_LEN) :: filename_f
+    character(len=MAX_STRING_LEN) :: venous_option_f
 
     call strncpy(filename_f, FIELDFILE, filename_len)
-    call strncpy(radius_type_f, radius_type, radius_type_len)
+    call strncpy(venous_option_f, venous_option, venous_option_len)
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_define_rad_from_file(filename_f, radius_type_f)
+    call so_define_rad_from_file(filename_f, venous_option_f)
 #else
-    call define_rad_from_file(filename_f, radius_type_f)
+    call define_rad_from_file(filename_f, venous_option_f)
 #endif
 
     end subroutine define_rad_from_file_c

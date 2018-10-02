@@ -10,7 +10,7 @@ module indices
   integer :: num_nj,nj_aw_press,nj_bv_press
   ! indices for elem_field
   integer ::num_ne,ne_radius,ne_length,ne_vol,&
-       ne_resist,ne_dvdt,ne_radius_in,ne_radius_in0,&
+       ne_resist,ne_radius_in,ne_radius_in0,&
        ne_radius_out,ne_radius_out0,ne_group,ne_Qdot
   ! indices for unit_field
   integer :: num_nu,nu_perf,nu_blood_press
@@ -22,8 +22,8 @@ public num_ord,no_gen,no_hord,no_sord
 
 public num_nj,nj_aw_press,nj_bv_press
 
-public num_ne,ne_radius,ne_length,ne_vol,&
-      ne_resist,ne_dvdt,ne_radius_in,ne_radius_in0,ne_radius_out,&
+public num_ne,ne_radius,ne_length,&
+      ne_resist,ne_radius_in,ne_radius_in0,ne_radius_out,&
       ne_radius_out0,ne_group,ne_Qdot
 
 public num_nu,nu_perf,nu_blood_press
