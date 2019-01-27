@@ -597,9 +597,10 @@ contains
     integer, intent(inout) :: num_convolutes,num_generations
 
     real(dp) :: int_length,int_radius,cap_length,cap_radius,seg_length,viscosity, &
-                seg_resistance,cap_resistance,terminal_resistance,total_resistance,cap_unit_radius
+                seg_resistance,cap_resistance,terminal_resistance,total_resistance,cap_unit_radius,total_length
+    real(dp) :: int_radius_in, int_radius_out
     real(dp),allocatable :: resistance(:)
-    integer :: ne,nu,i,j,np1,np2,nc
+    integer :: ne,nu,i,j,np1,np2,nc,nv
     integer :: AllocateStatus
     character(len=60) :: sub_name
     integer:: diagnostics_level
@@ -625,45 +626,54 @@ contains
        STOP "*** Not enough memory for resistance array ***"
     endif
 
-    !calculate total resistance of terminal capillary conduits    
+    ne =units(1) !Get a terminal unit
+    nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+    nv =  elem_cnct(1,1,nc) !vein is downstream of the capillary
+    int_radius_in = (elem_field(ne_radius,ne)+elem_field(ne_radius,nv))/2.0_dp ! mm radius of inlet intermediate villous (average of artery and vein)
+    int_radius_out=(0.03_dp + 0.03_dp/2.0_dp)/2.0_dp ! mm radius of mature intermediate villous (average of artery and vein)
     int_length=1.5_dp !mm Length of each intermediate villous
-    int_radius=0.030_dp/2  !0.0015; mm radius of each intermediate villous
-    cap_length=3_dp !mm length of capillary convolutes
-    cap_radius=0.0144_dp/2 !radius of capillary convolutes
+    cap_length=3_dp/num_convolutes !mm length of capillary convolutes
+    cap_radius=0.0144_dp/2.0_dp !radius of capillary convolutes
     seg_length=int_length/num_convolutes !lengh of each intermediate villous segment
     viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
-	
-    seg_resistance=(8.d0*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
+    cap_unit_radius = 0.03_dp
     cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
-
-    i=1
-    resistance(i)= cap_resistance + 2.d0*seg_resistance
-    do i=2,num_convolutes+1
-      resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1)) 
-    enddo
-    terminal_resistance = resistance(num_convolutes+1) !Pa . s per mm^3 total resistance of terminal capillary conduits
+	total_resistance = 0
 	
-    !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
-    !of the system by summing the resistance of each generation
-    total_resistance = 0
+
     do j=1,num_generations
+      int_radius = int_radius_in - (int_radius_in-int_radius_out)/num_generations*j
+
+      seg_resistance=(8.d0*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
+      !calculate total resistance of terminal capillary conduits
+      i=1
+      resistance(i)= cap_resistance + 2.d0*seg_resistance
+      do i=2,num_convolutes
+        resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1))
+      enddo
+      terminal_resistance = resistance(num_convolutes) !Pa . s per mm^3 total resistance of terminal capillary conduits
+	
+      !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
+      !of the system by summing the resistance of each generation
+
       total_resistance = total_resistance + terminal_resistance/2**j
     enddo
 
+    total_length = total_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
+
     if(diagnostics_level.GE.1)then
       print *, "terminal_resistance=",terminal_resistance
-      print *, "total_resistanc=",total_resistance	
+      print *, "total_resistance=",total_resistance
     endif
 
     !set the effective length of each capillary unit based the total resistance of capillary convolutes   
-    cap_unit_radius = 0.03_dp  
     do nu=1,num_units
       ne =units(nu) !Get a terminal unit
       nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
       !update element radius
       elem_field(ne_radius,nc) = cap_unit_radius
       !update element length   
-      elem_field(ne_length,nc) = total_resistance*(PI*elem_field(ne_radius,nc)**4)/(8.d0*viscosity)
+      elem_field(ne_length,nc) = total_length
       !update element direction
       np1=elem_nodes(1,nc)
       np2=elem_nodes(2,nc)

@@ -1,3 +1,7 @@
 
 *.pyc
+#Mac files
+.DS_Store
 
+#IDE project docs
+.project
