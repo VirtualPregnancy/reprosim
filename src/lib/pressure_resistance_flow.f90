@@ -487,7 +487,7 @@ subroutine initialise_solution(pressure_in,pressure_out,cardiac_output,mesh_dof,
          endif
          n_depvar=depvar_at_elem(0,1,ne) !--> This will be a flow because it's the depvar at the element
          if(.NOT.FIX(n_depvar))then
-           prq_solution(n_depvar)=cardiac_output/(2**(elem_ordrs(1,ne)-1)) !Here you can use the generation number to split flow
+           prq_solution(n_depvar)=cardiac_output/(2.0_dp**(elem_ordrs(1,ne)-1)) !Here you can use the generation number to split flow
          endif
        enddo
     enddo

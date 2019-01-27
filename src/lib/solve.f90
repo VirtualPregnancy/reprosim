@@ -306,7 +306,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
     real ( kind = 8 ) s(mr+1)
     integer ( kind = 4 ) ua(n)
     real ( kind = 8 ) v(n,mr+1);
-    logical, parameter :: verbose = .false.
+    logical, parameter :: verbose = .true.
     real ( kind = 8 ) y(mr+1)
 
 
