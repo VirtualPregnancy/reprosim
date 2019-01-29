@@ -252,9 +252,11 @@
       integer :: test_elems_at_node(8,0:3) !array size: num_nodes, 0:3
       integer :: test_elem_cnct(-1:1,0:2,0:8) !array size: -1:1,0:2,0:num_elems
       integer :: test_elem_ordrs(num_ord,8) !array size: num_ord, num_elems
-      
-      call add_matching_mesh()
-      
+      character(LEN=60) :: umbilical_elem_option     
+
+      umbilical_elem_option = "same_as_arterial"
+      call add_matching_mesh(umbilical_elem_option)
+
       !populate test variables
       call set_nodes(test_nodes(1:4)) !arterial num_nodes
       call set_nodes_ven(test_nodes(5:8)) !venous num_nodes

@@ -27,7 +27,7 @@ contains
 !
 !###################################################################################
 !
-  subroutine add_matching_mesh(umbilical_elem_option, umbilical_elems)
+  subroutine add_matching_mesh(umbilical_elem_option_in, UMB_ELEMS_FILE)
   !*Description:* adds a matching venous mesh to an arterial mesh
     use arrays,only: dp,elems,elem_cnct,elem_direction,elem_field,&
          elem_nodes,elem_ordrs,elem_symmetry,elems_at_node,&
@@ -38,30 +38,29 @@ contains
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ADD_MATCHING_MESH" :: ADD_MATCHING_MESH 
-    character(len=MAX_STRING_LEN),intent(in) ::  umbilical_elem_option  !argument controlling how the umbilical 
+    character(len=MAX_STRING_LEN),intent(in) ::  umbilical_elem_option_in  !argument controlling how the umbilical 
     !venous elements are created, 'same_as_arterial' or 'single_umbilical_vein'
-    integer,intent(in)  :: umbilical_elems(:)         ! list of umbilical artery element numbers 
+    character(len=MAX_FILENAME_LEN), optional :: UMB_ELEMS_FILE   !file containing a list of umbilical artery element numbers 
     !Parameters to become inputs
     real(dp) :: offset(3)
     logical :: REVERSE=.TRUE.
     !local variables
+    character(LEN=MAX_STRING_LEN) :: umbilical_elem_option
     integer :: num_nodes_new,num_elems_new,ne,ne_global,np,np_global,np0,nonode,np_m, &
             downstream_elem, node_counter, elem_counter, indx, elem_at_node, indx2, &
-            umb_elem_counter, umb_node_counter, &
-            nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter,i,j, &
-            ne_indx, max_ne, max_elem_indx, new_node_indx, umb_node1_indx, umb_node2_indx, &
-            umb_node_counter, node_no
+            nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter, &
+            max_ne, max_elem_indx,umb_node_counter,node_no,no_umb_art_nodes, &
+            inlet_counter,outlet_counter,j,umb_elems_count,umb_elem_indx,ierror,ntemp,dwn_elems 
     integer, allocatable :: np_map(:)
     integer, allocatable :: ne_map(:)
     integer :: umb_inlets(2) = 0
     integer :: umb_outlets(2) = 0
-    integer :: new_umb_elems(3) = 0
-    integer :: new_umb_nodes(4) = 0
-    integer, allocatable :: umb_art_nodes
-
-    integer :: umb_art_elems(5) = 0
-    integer :: copy_nodes(4) = 0
-    INTEGER, DIMENSION(4) :: umb_node_indx = (/ 1, 2, 5, 6 /) 
+    integer :: umb_outlet_nodes(2) = 0
+    integer :: umb_ven_elems(3) = 0 !umbilical venous elements
+    integer :: umb_ven_nodes(4) = 0 !umbilical venous nodes
+    integer, allocatable :: umb_art_nodes(:)
+    integer :: umbilical_elems(20) = 0
+    character(LEN=132) :: ctemp1
 
     character(len=60) :: sub_name
     integer :: diagnostics_level
@@ -70,13 +69,43 @@ contains
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
     
-    if((umbilical_elem_option.NE.'same_as_arterial').AND.(umbilical_elem_option.NE.'single_umbilical_vein'))then
+    if((umbilical_elem_option_in.NE.'same_as_arterial').AND.(umbilical_elem_option_in.NE.'single_umbilical_vein'))then
       print *, "Unknown option for creating a venous mesh. Using same_as_arterial."
       umbilical_elem_option = 'same_as_arterial'
+    else
+      umbilical_elem_option = umbilical_elem_option_in
     endif
 
-    if((umbilical_elem_option.EQ.'single_umbilical_vein').AND.(len(umbilical_elems).EQ.0))then
-      print *,"No umbilical elements listed as input argument to add_matching_mesh. Using option same_as_arterial."
+    !if((umbilical_elem_option_in.EQ.'single_umbilical_vein').AND.(len(UMB_ELEMS_FILE).GT.0))then
+    if((umbilical_elem_option_in.EQ.'single_umbilical_vein').AND.(present(UMB_ELEMS_FILE)).AND.(UMB_ELEMS_FILE.NE.""))then
+       open(10, file=UMB_ELEMS_FILE, status='old')
+       umb_elem_indx = 0
+       read_umb_element : do  
+          read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+          
+             if(ierror.GT.0)then
+                print *, "Error reading umbilical elements file", UMB_ELEMS_FILE
+                call exit(1)
+	     elseif(ierror.LT.0)then
+                exit read_umb_element
+             else
+                read (ctemp1, '(i10)' ) ntemp 
+                umb_elem_indx = umb_elem_indx + 1 
+                umbilical_elems(umb_elem_indx) = ntemp
+	     endif
+       end do read_umb_element
+       close(10)
+
+       if(diagnostics_level.GT.1)then
+          print *, "umbilical_elems", umbilical_elems
+       endif
+
+    endif
+
+    umb_elems_count = count(umbilical_elems.NE.0)
+
+    if((umbilical_elem_option_in.EQ.'single_umbilical_vein').AND.(umb_elems_count.EQ.0))then
+      print *,"No umbilical elements found. Using option same_as_arterial."
       umbilical_elem_option = 'same_as_arterial'
     endif
 
@@ -96,22 +125,30 @@ contains
 
        !populate the umbilical arterial nodes array and
        !find the inlet(s) and outlets in the umbilical elements
-       allocate(umb_art_nodes(len(umbilical_elems)+1))
+
+       allocate(umb_art_nodes(umb_elems_count + 1))
        umb_art_nodes = 0
 
        inlet_counter = 0
        outlet_counter = 0
        umb_node_counter = 0
-       do noelem=1,len(umbilical_elems)
+       do noelem=1,umb_elems_count
 	  ne = umbilical_elems(noelem)
 	  if(elem_cnct(-1,0,ne).EQ.0)then
              inlet_counter = inlet_counter + 1
 	     umb_inlets(inlet_counter) = ne !no upstream elements so this an inlet element
 	  endif
-	  if(elem_cnct(1,0,ne).EQ.0)then
-             outlet_counter = outlet_counter + 1
-	     umb_outlets(outlet_counter) = ne !no downstream elements so this an outlet element
-	  endif
+          !look for umbilical outlets = elements whose downstream elements are not umbilical elements themselves
+          dwn_elems = elem_cnct(1,0,ne) !number of downstream elements
+	  if(dwn_elems.GT.0)then
+	     if(ALL(umbilical_elems.NE.elem_cnct(1,1,ne)))then
+                outlet_counter = outlet_counter + 1
+	        umb_outlets(outlet_counter) = ne
+	        !store second nodes for mapping between arterial and venous elements
+                umb_outlet_nodes(outlet_counter) = elem_nodes(2,ne)
+	     endif
+          endif
+
           do node_no=1,2
              np = elem_nodes(node_no,ne)
              if(ALL(umb_art_nodes.NE.np))then
@@ -121,16 +158,21 @@ contains
           enddo
        enddo
 
-       if(len(umb_inlets).EQ.0)then
+       if(count(umb_inlets.NE.0).EQ.0)then
           print *,"inlet not found"
 	  call exit(1)
        endif
 
+       if(count(umb_outlets.NE.0).EQ.0)then
+          print *,"umbilical outlets not found"
+	  call exit(1)
+       endif
+
        ! the number of nodes after adding mesh will be:
-       num_nodes_new = 2*num_nodes - (len(umbilical_elems) + 1 - 4) !number of nodes in umbilical 
+       num_nodes_new = 2*num_nodes - (umb_elems_count + 1 - 4) !number of nodes in umbilical 
        !arteries = number of elems + 1; 4 umbilical vein nodes
        ! the number of elems after adding mesh will be:
-       num_elems_new = 2*num_elems + num_units - (len(umbilical_elems) - 3) !there are 3 umbilical venous elements
+       num_elems_new = 2*num_elems + num_units - (umb_elems_count - 3) !there are 3 umbilical venous elements
                                                    
     endif
 
@@ -158,8 +200,8 @@ contains
        !create the umbilical vein nodes matching the umbilical arterial outlet nodes
        do indx=1,2
           np=np_global+node_counter
-          new_umb_nodes(indx) = np
-          nonode = umb_outlets(indx)
+          umb_ven_nodes(indx) = np
+          nonode = umb_outlet_nodes(indx)
           np_m=nodes(nonode)
           np_map(np_m)=np !maps new to old node numbering
           nodes(np0+node_counter)=np
@@ -172,17 +214,17 @@ contains
        !create a node in between the venous outlet nodes
        !get the centre of mass between the two nodes
        np=np_global+node_counter
-       new_umb_nodes(3) = np
+       umb_ven_nodes(3) = np
        nodes(np0+node_counter)=np
        do nj=1,3
-          node_xyz(nj,np)=(node_xyz(nj,new_umb_nodes(1))+node_xyz(nj,new_umb_nodes(2)))/2
+          node_xyz(nj,np)=(node_xyz(nj,umb_ven_nodes(1))+node_xyz(nj,umb_ven_nodes(2)))/2
        enddo   
        node_counter = node_counter + 1  
 
        !if two inlets then create a new node in between them
-       if(len(umb_inlets).GT.1)then
+       if(count(umb_inlets.NE.0).GT.1)then
           np=np_global+node_counter
-          new_umb_nodes(4) = np
+          umb_ven_nodes(4) = np
           nodes(np0+node_counter)=np   
           do nj=1,3
              node_xyz(nj,np)=(node_xyz(nj,umb_inlets(1))+node_xyz(nj,umb_inlets(2)))/2 + offset(nj)
@@ -192,7 +234,7 @@ contains
        else
           !if one inlet copy the first node
           np=np_global+node_counter
-          new_umb_nodes(4) = np
+          umb_ven_nodes(4) = np
           nodes(np0+node_counter)=np   
           do nj=1,3
              node_xyz(nj,np)=node_xyz(nj,umb_inlets(1)) + offset(nj)
@@ -234,45 +276,39 @@ contains
 
     elem_counter = 1
 
-    if(umbilical_elem_option.NE.'same_as_arterial')then
-       !copy the inlet element
+    if(umbilical_elem_option.EQ.'single_umbilical_vein')then
+
+       !create an element between nodes 3 and 4
        ne=ne_global+elem_counter
-       new_umb_elems(1)=ne
+       umb_ven_elems(1)=ne
        elem_field(ne_group,ne)=2.0_dp!VEIN
        elems(ne0+elem_counter)=ne
-       elem_nodes(1,ne)=new_umb_nodes(2)
-       elem_nodes(2,ne)=new_umb_nodes(1)
+       elem_nodes(1,ne)=umb_ven_nodes(3)
+       elem_nodes(2,ne)=umb_ven_nodes(4)
+       elem_counter = elem_counter + 1
+       
+       !create an element between nodes 1 and 3
+       ne=ne_global+elem_counter
+       umb_ven_elems(2)=ne
+       elem_field(ne_group,ne)=2.0_dp!VEIN
+       elems(ne0+elem_counter)=ne
+       elem_nodes(1,ne)=umb_ven_nodes(1)
+       elem_nodes(2,ne)=umb_ven_nodes(3)
        elem_counter = elem_counter + 1
 
-       !create an element connecting the newly created node and the first node of the inlet and 
+       !create an element between nodes 2 and 3
        ne=ne_global+elem_counter
-       new_umb_elems(2)=ne
+       umb_ven_elems(3)=ne
        elem_field(ne_group,ne)=2.0_dp!VEIN
        elems(ne0+elem_counter)=ne
-       elem_nodes(1,ne)=new_umb_nodes(new_node_indx)
-       elem_nodes(2,ne)=new_umb_nodes(2)
+       elem_nodes(1,ne)=umb_ven_nodes(2)
+       elem_nodes(2,ne)=umb_ven_nodes(3)
        elem_counter = elem_counter + 1
-       !create two elements connecting the first nodes of the last two umbilical elements
-       !and the newly created node
-       ne=ne_global+elem_counter
-       new_umb_elems(3)=ne
-       elem_field(ne_group,ne)=2.0_dp!VEIN
-       elems(ne0+elem_counter)=ne
-       elem_nodes(1,ne)=new_umb_nodes(umb_node1_indx)
-       elem_nodes(2,ne)=new_umb_nodes(new_node_indx)
-       elem_counter = elem_counter + 1
+     
 
-       ne=ne_global+elem_counter
-       new_umb_elems(4)=ne
-       elem_field(ne_group,ne)=2.0_dp!VEIN
-       elems(ne0+elem_counter)=ne
-       elem_nodes(1,ne)=new_umb_nodes(umb_node1_indx)
-       elem_nodes(2,ne)=new_umb_nodes(new_node_indx)
-       elem_counter = elem_counter + 1
-    
        !populate elements at a node for the new umbilical venous elements
-       do indx=1,4
-          noelem=new_umb_elems(indx)
+       do indx=1,3
+          noelem=umb_ven_elems(indx)
           elems_at_node(elem_nodes(1,noelem),0)=elems_at_node(elem_nodes(1,noelem),0)+1
           elems_at_node(elem_nodes(1,noelem),elems_at_node(elem_nodes(1,noelem),0))=noelem
           elems_at_node(elem_nodes(2,noelem),0)=elems_at_node(elem_nodes(2,noelem),0)+1
@@ -326,34 +362,32 @@ contains
            endif   
     enddo
 
-    if(umbilical_elem_option.NE.'same_as_arterial')then
+    if(umbilical_elem_option.EQ.'single_umbilical_vein')then
 
         !populate element connectivity for the new umbilical venous elements
-        elem_cnct(-1,0,new_umb_elems(1)) = 1
-	elem_cnct(-1,1,new_umb_elems(1)) = new_umb_elems(2)
-        elem_cnct(1,0,new_umb_elems(1)) = 0
+        elem_cnct(-1,0,umb_ven_elems(1)) = 2
+        elem_cnct(-1,1,umb_ven_elems(1)) = umb_ven_elems(2)
+        elem_cnct(-1,2,umb_ven_elems(1)) = umb_ven_elems(3)
+        elem_cnct(1,0,umb_ven_elems(1)) = 0 
 
-        elem_cnct(-1,0,new_umb_elems(2)) = 2
-        elem_cnct(-1,1,new_umb_elems(2)) = new_umb_elems(3)
-        elem_cnct(-1,2,new_umb_elems(2)) = new_umb_elems(4)
-        elem_cnct(1,0,new_umb_elems(2)) = 1
-        elem_cnct(1,1,new_umb_elems(2)) = new_umb_elems(1)
+        elem_cnct(-1,0,umb_ven_elems(2)) = 0
+        elem_cnct(1,0,umb_ven_elems(2)) = 1
+        elem_cnct(1,1,umb_ven_elems(2)) = umb_ven_elems(1)
 
-        elem_cnct(1,0,new_umb_elems(3)) = 1
-        elem_cnct(1,1,new_umb_elems(3)) = new_umb_elems(2)
+        elem_cnct(-1,0,umb_ven_elems(3)) = 0
+        elem_cnct(1,0,umb_ven_elems(3)) = 1
+        elem_cnct(1,1,umb_ven_elems(3)) = umb_ven_elems(1)
 
-        elem_cnct(1,0,new_umb_elems(4)) = 1
-        elem_cnct(1,1,new_umb_elems(4)) = new_umb_elems(2)
 
         !fix element connectivity for elements upstream of new umbilical venous elements  
-        do indx=3,4
-           noelem = new_umb_elems(indx)
+        do indx=2,3
+           noelem = umb_ven_elems(indx)
            nonode = elem_nodes(1,noelem) !get the first node
 	   !get elements connected to the first node
            do indx2=1,elems_at_node(nonode,0)
-	      elem_at_node = elems_at_node(nonode,indx2)
-              !populate downstream element
+	      elem_at_node = elems_at_node(nonode,indx2)             
               if(elem_at_node.NE.noelem)then
+          
                  elem_cnct(1,0,elem_at_node)=1
 	         elem_cnct(1,1,elem_at_node)=noelem
 
@@ -365,29 +399,21 @@ contains
 
         !element orders for the first new element - the same as the arterial inlet
         nindex=no_gen
-        elem_ordrs(nindex,new_umb_elems(1))=elem_ordrs(nindex,inlet)
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umb_inlets(1))
         nindex=no_sord
-        elem_ordrs(nindex,new_umb_elems(1))=elem_ordrs(nindex,inlet)
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umb_inlets(1))
         nindex=no_hord
-        elem_ordrs(nindex,new_umb_elems(1))=elem_ordrs(nindex,inlet)
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umb_inlets(1))
 
-        !element orders for the second new element - the same as the arterial inlet
-        nindex=no_gen
-        elem_ordrs(nindex,new_umb_elems(2))=elem_ordrs(nindex,inlet)
-        nindex=no_sord
-        elem_ordrs(nindex,new_umb_elems(2))=elem_ordrs(nindex,inlet)
-        nindex=no_hord
-        elem_ordrs(nindex,new_umb_elems(2))=elem_ordrs(nindex,inlet)
-
-        !element orders for the last two new elements - the same as the second
-        !and third element in umb_art_elems
-        do indx=3,4
+        !element orders for the second and third new element - the same as the arterial 
+        !umbilical outlets
+        do indx=2,3
            nindex=no_gen
-           elem_ordrs(nindex,new_umb_elems(indx))=elem_ordrs(nindex,umb_art_elems(indx-1))
+           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_outlets(indx-1))
            nindex=no_sord
-           elem_ordrs(nindex,new_umb_elems(indx))=elem_ordrs(nindex,umb_art_elems(indx-1))
+           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_outlets(indx-1))
            nindex=no_hord
-           elem_ordrs(nindex,new_umb_elems(indx))=elem_ordrs(nindex,umb_art_elems(indx-1))
+           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_outlets(indx-1))
         enddo
 
      endif !umbilical_elem_option

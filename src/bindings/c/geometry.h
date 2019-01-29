@@ -4,7 +4,7 @@
 
 #include "symbol_export.h"
 
-SHO_PUBLIC void add_matching_mesh(const char *umbilical_elem_option);
+SHO_PUBLIC void add_matching_mesh(const char *umbilical_elem_option, const char *UMB_ELEMS_FILE);
 SHO_PUBLIC void append_units();
 SHO_PUBLIC void calc_capillary_unit_length(int num_convolutes, int num_generations);
 SHO_PUBLIC void define_1d_elements(const char *ELEMFILE);

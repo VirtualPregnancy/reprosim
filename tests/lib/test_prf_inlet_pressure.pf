@@ -15,7 +15,7 @@
     character(len=MAX_FILENAME_LEN) :: ELEMFILE
     character(LEN=100) :: order_system,order_options,name
     real(dp) :: s_ratio, inlet_rad
-    character(LEN=60) :: mesh_type, bc_type
+    character(LEN=60) :: mesh_type, bc_type, umbilical_elem_option
     real(dp) :: inlet_flow,inlet_pressure,outlet_pressure
     real(dp) :: test_elem_field(1,8) !(num_ne: num_elems)
     real(dp) :: test_node_field(1,8) !(num_nj : num_nodes)
@@ -32,7 +32,9 @@
     call define_1d_elements(ELEMFILE)
     call delete_elem_file(ELEMFILE)
     call append_units()
-    call add_matching_mesh()
+    umbilical_elem_option = "same_as_arterial"
+    call add_matching_mesh(umbilical_elem_option)
+
     !define radius for arterial vessels
     order_system = "strahler"
     s_ratio=1.54_dp

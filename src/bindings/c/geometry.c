@@ -3,7 +3,7 @@
 
 #include "string.h"
 
-void add_matching_mesh_c(const char *umbilical_elem_option, int *umbilical_elem_option_len);
+void add_matching_mesh_c(const char *umbilical_elem_option, int *umbilical_elem_option_len, const char *UMB_ELEMS_FILE, int *filename_len);
 void append_units_c();
 void calc_capillary_unit_length_c(int *num_convolutes, int *num_generations);
 void define_1d_elements_c(const char *ELEMFILE, int *filename_len);
@@ -16,10 +16,11 @@ void element_connectivity_1d_c();
 void evaluate_ordering_c();
 
 
-void add_matching_mesh(const char *umbilical_elem_option)
+void add_matching_mesh(const char *umbilical_elem_option, const char *UMB_ELEMS_FILE)
 {
-  int umbilical_elem_option_len = strlen(umbilical_elem_option);	
-  add_matching_mesh_c(umbilical_elem_option, &umbilical_elem_option_len);
+  int umbilical_elem_option_len = strlen(umbilical_elem_option);
+  int filename_len = strlen(UMB_ELEMS_FILE);	
+  add_matching_mesh_c(umbilical_elem_option, &umbilical_elem_option_len, UMB_ELEMS_FILE, &filename_len);
 }
 
 void append_units()
