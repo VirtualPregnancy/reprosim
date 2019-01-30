@@ -117,27 +117,29 @@ contains
 !
 !###################################################################################
 !
-  subroutine define_rad_from_file_c(FIELDFILE, filename_len, venous_option, venous_option_len) &
-          bind(C, name="define_rad_from_file_c")
+  subroutine define_rad_from_file_c(FIELDFILE, filename_len, order_system, &
+          order_system_len,s_ratio) bind(C, name="define_rad_from_file_c")
 
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     use geometry, only: define_rad_from_file
+    use arrays, only: dp
     implicit none
 
-    integer,intent(in) :: filename_len, venous_option_len
-    type(c_ptr), value, intent(in) :: FIELDFILE, venous_option
+    integer,intent(in) :: filename_len, order_system_len
+    type(c_ptr), value, intent(in) :: FIELDFILE, order_system
+    real(dp),intent(in) :: s_ratio
     character(len=MAX_FILENAME_LEN) :: filename_f
-    character(len=MAX_STRING_LEN) :: venous_option_f
+    character(len=MAX_STRING_LEN) :: order_system_f
 
     call strncpy(filename_f, FIELDFILE, filename_len)
-    call strncpy(venous_option_f, venous_option, venous_option_len)
+    call strncpy(order_system_f, order_system, order_system_len)
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_define_rad_from_file(filename_f, venous_option_f)
+    call so_define_rad_from_file(filename_f, order_system_f,s_ratio)
 #else
-    call define_rad_from_file(filename_f, venous_option_f)
+    call define_rad_from_file(filename_f, order_system_f,s_ratio)
 #endif
 
     end subroutine define_rad_from_file_c

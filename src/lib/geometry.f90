@@ -28,7 +28,13 @@ contains
 !###################################################################################
 !
   subroutine add_matching_mesh(umbilical_elem_option_in, UMB_ELEMS_FILE)
-  !*Description:* adds a matching venous mesh to an arterial mesh
+  !*Description:* adds a matching venous mesh to an arterial mesh.
+  ! Two options are availabe: 1) 'same_as_arterial' - the venous vessels
+  ! are an exact copy of the arterial vessels. 2) 'single_umbilical_vein' -
+  ! a file containing umbilical arterial elements in separate lines must be
+  ! given. The umbilical arterial vessels will not be copied. 
+  ! A single umbilical vein will be created instead.
+ 
     use arrays,only: dp,elems,elem_cnct,elem_direction,elem_field,&
          elem_nodes,elem_ordrs,elem_symmetry,elems_at_node,&
          nodes,node_xyz,num_elems,&
@@ -961,26 +967,33 @@ contains
 !
 !###################################################################################
 !
-  subroutine define_rad_from_file(FIELDFILE,venous_option_in)
-  !*Description:* Reads in a radius field associated with a vascular tree
-  ! and assigns radius information to each element, also calculates volume of each
-  ! element
+  subroutine define_rad_from_file(FIELDFILE,order_system, s_ratio)
+  !*Description:* Reads in a radius field associated with the full feto-placental tree
+  ! and assigns radius information to each element. If only radii for part of the tree
+  ! are available (starting with the inlet), the remaining arterial vessel radii are 
+  ! calcuated based on the order system and ratio in the input arguments. If venous
+  ! vessels were added using add_matching_mesh and their radius was not available in 
+  ! the radius field file, define_rad_from_geometry must be used for the venous vessels.
+
     use arrays,only: dp,elem_field,elem_cnct,elem_nodes,&
-         elems_at_node,num_elems,num_nodes
-    use indices,only: ne_length,ne_radius
+         elems_at_node,num_elems,num_nodes, num_arterial_elems, elem_ordrs
+    use indices,only: ne_length,ne_radius,ne_radius_in,ne_radius_out,no_sord,no_hord 
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_RAD_FROM_FILE" :: DEFINE_RAD_FROM_FILE
 
     character(len=MAX_FILENAME_LEN), intent(in) :: FIELDFILE
-    character(len=MAX_STRING_LEN), optional ::  venous_option_in
+    character(len=MAX_STRING_LEN), optional ::  order_system
+    real(dp), optional :: s_ratio
+
     !     Local Variables
-    real(dp) :: node_radius(num_nodes)
-    integer :: ierror,ne,np,np1,np2,np_global,surround
+    real(dp), allocatable :: node_radius(:)
+    integer :: ierror,ne,np,np1,np2,np_global,surround,radii_num_nodes, &
+               minelem_no_radius,start_elem,n_max_ord,nindex,remaining_elems
     character(LEN=132) :: ctemp1
     LOGICAL :: versions
-    real(dp) :: radius
+    real(dp) :: radius,start_rad
     character(len=MAX_STRING_LEN) ::  venous_option
     character(len=60) :: sub_name
     integer :: diagnostics_level
@@ -991,15 +1004,26 @@ contains
     
     versions = .TRUE.
 
-
-    if(present(venous_option_in))then
-      venous_option = venous_option_in
-    else
-      venous_option = 'no_venous_radii'
-    endif
-
-
     open(10, file=FIELDFILE, status='old')
+
+    !.....read the number of nodes for which we have radii
+    !.....read each line until one is found
+    !.....that has the correct keyword (nodes). then return the integer that is
+    !.....at the end of the line
+    read_number_of_nodes : do !define a do loop name
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1 !read a line into ctemp1
+       if(index(ctemp1, "nodes")> 0) then !keyword "nodes" is found in ctemp1
+          call get_final_integer(ctemp1,radii_num_nodes) !return the final integer
+          if(diagnostics_level.GT.1)then
+       	  	print *, "radii_num_nodes",radii_num_nodes
+       	  endif
+          exit read_number_of_nodes !exit the named do loop
+       endif
+
+    end do read_number_of_nodes
+
+
+   allocate(node_radius(radii_num_nodes))
 
     !.....check whether versions are prompted (>1) - versions are not used later in this subroutine
     read_versions : do !define a do loop name
@@ -1028,21 +1052,75 @@ contains
                 node_radius(np)=radius   
           endif
        endif !index
-       if(np.ge.num_nodes) exit read_a_node
+       if(np.ge.radii_num_nodes) exit read_a_node
     end do read_a_node
 
-    ! calculate the element volumes
+    minelem_no_radius = num_elems
+    ! assign a radius to each element whose 2nd node is in the radius file
     do ne=1,num_elems
        !for each element set the element radius to the radius of the second node
        np2=elem_nodes(2,ne)
-       elem_field(ne_radius,ne) = node_radius(np2)
+       if(np2.LE.radii_num_nodes)then
+          elem_field(ne_radius,ne) = node_radius(np2)
+          elem_field(ne_radius_in,ne) = node_radius(np2)
+          elem_field(ne_radius_out,ne) = node_radius(np2)
+          if(diagnostics_level.GT.1)then
+     	     print *,"radius for element",ne,"=",elem_field(ne_radius,ne) 
+     	     print *,"radius in for element",ne,"=",elem_field(ne_radius_in,ne)
+     	     print *,"radius out for element",ne,"=",elem_field(ne_radius_out,ne)      
+          endif
+       elseif(minelem_no_radius.NE.0)then
+          if(ne.LT.minelem_no_radius)then
+             minelem_no_radius = ne
+          endif
+       endif
     enddo
 
-    if(diagnostics_level.GT.1)then
-        do ne=1,num_elems
-     	   print *,"radius for element",ne,"=",elem_field(ne_radius,ne)
-        enddo
-     endif
+    if(minelem_no_radius.LT.num_elems)then
+
+       ! calculate radii for the remaining arterial elements whose 2nd node radius 
+       ! was not in the file
+       if(num_arterial_elems.GT.0)then
+          remaining_elems = num_arterial_elems
+       else
+          remaining_elems = num_elems
+       endif
+
+       !Strahler and Horsfield ordering system
+       if(ORDER_SYSTEM(1:5).EQ.'strah')THEN
+          nindex=no_sord !for Strahler ordering
+       else if(ORDER_SYSTEM(1:5).eq.'horsf')then
+          nindex = no_hord !for Horsfield ordering
+       endif
+
+       ! get the radius of element upstream of the first element that doesn't
+       ! yet have a radius
+       start_elem = elem_cnct(-1,1,minelem_no_radius)
+       start_rad = elem_field(ne_radius,start_elem)
+       n_max_ord = elem_ordrs(nindex,start_elem)
+
+       if(diagnostics_level.GT.1)then
+          print *, "order system = ",order_system
+	  print *, "s_ratio=",s_ratio
+          print *, "calculated radii:"
+          print *, "start radius start_rad = ",start_rad
+       endif
+
+       do ne=minelem_no_radius,remaining_elems
+          radius=10.0_dp**(log10(s_ratio)*dble(elem_ordrs(nindex,ne)-n_max_ord)&
+           +log10(start_rad))
+          elem_field(ne_radius,ne)=radius  
+          elem_field(ne_radius_in,ne)=radius
+          elem_field(ne_radius_out,ne)=radius
+          if(diagnostics_level.GT.1)then
+	     print *,"element order for element",ne,"=",elem_ordrs(nindex,ne)
+     	     print *,"radius for element",ne,"=",elem_field(ne_radius,ne)
+     	     print *,"radius in for element",ne,"=",elem_field(ne_radius_in,ne)
+     	     print *,"radius out for element",ne,"=",elem_field(ne_radius_out,ne)
+          endif
+       enddo
+
+    endif !(minelem_no_radius.LT.num_elems)
 
     call enter_exit(sub_name,2)
 
@@ -1122,22 +1200,22 @@ contains
 
     !Strahler and Horsfield ordering system
     if(ORDER_SYSTEM(1:5).EQ.'strah')THEN
-      nindex=no_sord !for Strahler ordering
+      nindex = no_sord !for Strahler ordering
     else if(ORDER_SYSTEM(1:5).eq.'horsf')then
       nindex = no_hord !for Horsfield ordering
     endif
 
-	if(diagnostics_level.GT.1)then
-		print *, "ordering system= ",ORDER_SYSTEM(1:5)
-	endif
+    if(diagnostics_level.GT.1)then
+       print *, "ordering system= ",ORDER_SYSTEM(1:5)
+    endif
 
     ne=ne_start
     n_max_ord=elem_ordrs(nindex,ne)
     elem_field(ne_radius,ne)=START_RAD
 
-	if(diagnostics_level.GT.1)then
-		print *, "start radius START_RAD = ",START_RAD
-	endif
+    if(diagnostics_level.GT.1)then
+       print *, "start radius START_RAD = ",START_RAD
+    endif
 
     do ne=ne_min,ne_max
      radius=10.0_dp**(log10(CONTROL_PARAM)*dble(elem_ordrs(nindex,ne)-n_max_ord)&
