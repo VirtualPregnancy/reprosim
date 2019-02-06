@@ -27,7 +27,7 @@ contains
 !
 !###################################################################################
 !
-  subroutine add_matching_mesh(umbilical_elem_option_in, UMB_ELEMS_FILE)
+  subroutine add_matching_mesh(umbilical_elem_option_in, umbilical_element_numbers)
   !*Description:* adds a matching venous mesh to an arterial mesh.
   ! Two options are availabe: 1) 'same_as_arterial' - the venous vessels
   ! are an exact copy of the arterial vessels. 2) 'single_umbilical_vein' -
@@ -46,7 +46,7 @@ contains
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ADD_MATCHING_MESH" :: ADD_MATCHING_MESH 
     character(len=MAX_STRING_LEN),intent(in) ::  umbilical_elem_option_in  !argument controlling how the umbilical 
     !venous elements are created, 'same_as_arterial' or 'single_umbilical_vein'
-    character(len=MAX_FILENAME_LEN), optional :: UMB_ELEMS_FILE   !file containing a list of umbilical artery element numbers 
+    integer, intent(in), optional :: umbilical_element_numbers(:)  !list containing umbilical artery element numbers
     !Parameters to become inputs
     real(dp) :: offset(3)
     logical :: REVERSE=.TRUE.
@@ -66,6 +66,7 @@ contains
     integer :: umb_ven_nodes(4) = 0 !umbilical venous nodes
     integer, allocatable :: umb_art_nodes(:)
     integer :: umbilical_elems(20) = 0
+    integer :: index
     character(LEN=132) :: ctemp1
 
     character(len=60) :: sub_name
@@ -83,25 +84,11 @@ contains
     endif
 
     !if((umbilical_elem_option_in.EQ.'single_umbilical_vein').AND.(len(UMB_ELEMS_FILE).GT.0))then
-    if((umbilical_elem_option_in.EQ.'single_umbilical_vein').AND.(present(UMB_ELEMS_FILE)).AND.(UMB_ELEMS_FILE.NE.""))then
-       open(10, file=UMB_ELEMS_FILE, status='old')
-       umb_elem_indx = 0
-       read_umb_element : do  
-          read(unit=10, fmt="(a)", iostat=ierror) ctemp1
-          
-             if(ierror.GT.0)then
-                print *, "Error reading umbilical elements file", UMB_ELEMS_FILE
-                call exit(1)
-	     elseif(ierror.LT.0)then
-                exit read_umb_element
-             else
-                read (ctemp1, '(i10)' ) ntemp 
-                umb_elem_indx = umb_elem_indx + 1 
-                umbilical_elems(umb_elem_indx) = ntemp
-	     endif
-       end do read_umb_element
-       close(10)
+    if((umbilical_elem_option_in.EQ.'single_umbilical_vein').AND.(size(umbilical_element_numbers).GT.0))then
 
+       do index = 1, size(umbilical_element_numbers)
+          umbilical_elems(index) = umbilical_element_numbers(index)
+       enddo
        if(diagnostics_level.GT.1)then
           print *, "umbilical_elems", umbilical_elems
        endif
