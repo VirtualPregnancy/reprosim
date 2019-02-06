@@ -10,8 +10,8 @@ module indices
   integer :: num_nj,nj_aw_press,nj_bv_press
   ! indices for elem_field
   integer ::num_ne,ne_radius,ne_length,ne_vol,&
-       ne_resist,ne_radius_in,ne_radius_in0,&
-       ne_radius_out,ne_radius_out0,ne_group,ne_Qdot
+       ne_resist,ne_radius_in,&
+       ne_radius_out,ne_group,ne_Qdot
   ! indices for unit_field
   integer :: num_nu,nu_perf,nu_blood_press
 
@@ -22,9 +22,9 @@ public num_ord,no_gen,no_hord,no_sord
 
 public num_nj,nj_aw_press,nj_bv_press
 
-public num_ne,ne_radius,ne_length,&
-      ne_resist,ne_radius_in,ne_radius_in0,ne_radius_out,&
-      ne_radius_out0,ne_group,ne_Qdot
+public num_ne,ne_radius,ne_length,ne_vol,&
+      ne_resist,ne_radius_in,ne_radius_out,&
+      ne_group,ne_Qdot
 
 public num_nu,nu_perf,nu_blood_press
 
@@ -59,8 +59,7 @@ contains
     ne_radius_in=2 !strained radius into an element
     ne_radius_out=3 !strained radius out of an element
     ne_length=4!length of an elevent
-    ne_radius_in0=5!unstrained radius into an element
-    ne_radius_out0=6!unstrained radius out of an element
+    ne_vol=5!element volume
     ne_Qdot=7 !flow in an element
     ne_resist=8 !resistance of a blood vessel
     ne_group=9!Groups vessels into arteries (field=0), capillaries (field=1) and veins(field=2)

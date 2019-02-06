@@ -4,6 +4,28 @@ private
 
 contains
 
+
+!
+!###################################################################################
+!
+!*calculate_stats:* Calculates statistics for the feto-placental circulation model
+  subroutine calculate_stats_c() bind(C, name="calculate_stats_c")
+    use pressure_resistance_flow, only: calculate_stats
+    implicit none
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_calculate_stats
+#else
+    call calculate_stats
+#endif
+
+  end subroutine calculate_stats_c
+
+!
+!###################################################################################
+!
+
+
 !!!###################################################################################
 
 subroutine evaluate_prq_c(mesh_type,mesh_type_len,bc_type,bc_type_len,inlet_flow, &

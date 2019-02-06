@@ -55,7 +55,7 @@ contains
     integer :: num_nodes_new,num_elems_new,ne,ne_global,np,np_global,np0,nonode,np_m, &
             downstream_elem, node_counter, elem_counter, indx, elem_at_node, indx2, &
             nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter, &
-            max_ne, max_elem_indx,umb_node_counter,node_no,no_umb_art_nodes, &
+            max_ne, max_elem_indx,umb_node_counter,node_no,no_umb_art_nodes, umb_elem,&
             inlet_counter,outlet_counter,j,umb_elems_count,umb_elem_indx,ierror,ntemp,dwn_elems 
     integer, allocatable :: np_map(:)
     integer, allocatable :: ne_map(:)
@@ -127,6 +127,19 @@ contains
        ! the number of elems after adding mesh will be:
        num_elems_new = 2*num_elems + num_units
 
+       !get the umbilical inlet element number(s) to print the element number of the venous outlets
+       inlet_counter = 0
+       do ne=1,num_elems
+          if(elem_cnct(-1,0,ne).EQ.0)then
+             inlet_counter = inlet_counter + 1
+             umb_inlets(inlet_counter) = ne
+             if(diagnostics_level.GE.1)then
+                print *,""
+                print *,"umbilical inlet element number =",ne
+             endif
+          endif
+       enddo
+
     elseif(umbilical_elem_option.EQ.'single_umbilical_vein')then
 
        !populate the umbilical arterial nodes array and
@@ -143,6 +156,10 @@ contains
 	  if(elem_cnct(-1,0,ne).EQ.0)then
              inlet_counter = inlet_counter + 1
 	     umb_inlets(inlet_counter) = ne !no upstream elements so this an inlet element
+             if(diagnostics_level.GE.1)then
+                print *,""
+                print *,"umbilical inlet element number =",ne
+             endif
 	  endif
           !look for umbilical outlets = elements whose downstream elements are not umbilical elements themselves
           dwn_elems = elem_cnct(1,0,ne) !number of downstream elements
@@ -179,7 +196,7 @@ contains
        !arteries = number of elems + 1; 4 umbilical vein nodes
        ! the number of elems after adding mesh will be:
        num_elems_new = 2*num_elems + num_units - (umb_elems_count - 3) !there are 3 umbilical venous elements
-                                                   
+                                                 
     endif
 
     allocate(np_map(num_nodes))
@@ -285,6 +302,7 @@ contains
     if(umbilical_elem_option.EQ.'single_umbilical_vein')then
 
        !create an element between nodes 3 and 4
+       !umbilical venous outlet element
        ne=ne_global+elem_counter
        umb_ven_elems(1)=ne
        elem_field(ne_group,ne)=2.0_dp!VEIN
@@ -292,7 +310,12 @@ contains
        elem_nodes(1,ne)=umb_ven_nodes(3)
        elem_nodes(2,ne)=umb_ven_nodes(4)
        elem_counter = elem_counter + 1
-       
+
+       if(diagnostics_level.GE.1)then
+           print *,""
+           print *,"umbilical outlet element number =",umb_ven_elems(1)
+       endif       
+
        !create an element between nodes 1 and 3
        ne=ne_global+elem_counter
        umb_ven_elems(2)=ne
@@ -348,7 +371,18 @@ contains
 
            elem_counter = elem_counter + 1
         endif
-    enddo   
+    enddo 
+
+    if((umbilical_elem_option.EQ.'same_as_arterial').AND.(diagnostics_level.GE.1))then
+       do inlet_counter=1,2
+          umb_elem = umb_inlets(inlet_counter)
+          if(umb_elem.GT.0)then
+             print *,""
+             print *,"umbilical outlet element number",ne_map(umb_elem)
+          endif
+       enddo
+    endif
+  
     max_ne = ne
     max_elem_indx = ne0 + elem_counter - 1
 
@@ -694,13 +728,15 @@ contains
     total_length = total_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
 
     if(diagnostics_level.GE.1)then
-      print *, "terminal_resistance=",terminal_resistance
-      print *, "total_resistance=",total_resistance
+      print *, "resistance of a capillary conduit=",terminal_resistance
+      print *, "resistance of all generations of capillaries per terminal unit=",total_resistance
+      print *, "effective length of each capillary unit (mm)",total_length
+      print *, "Total capillary length for the vasculature (cm)",(total_length*num_units)/10
     endif
 
     !set the effective length of each capillary unit based the total resistance of capillary convolutes   
     do nu=1,num_units
-      ne =units(nu) !Get a terminal unit
+      ne =units(nu) !Get a terminal unit    
       nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
       !update element radius
       elem_field(ne_radius,nc) = cap_unit_radius
@@ -977,7 +1013,8 @@ contains
 
     use arrays,only: dp,elem_field,elem_cnct,elem_nodes,&
          elems_at_node,num_elems,num_nodes, num_arterial_elems, elem_ordrs
-    use indices,only: ne_length,ne_radius,ne_radius_in,ne_radius_out,no_sord,no_hord 
+    use indices,only: ne_length,ne_radius,ne_radius_in,ne_radius_out,no_sord, &
+                    no_hord,ne_vol 
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
@@ -1122,6 +1159,13 @@ contains
 
     endif !(minelem_no_radius.LT.num_elems)
 
+
+    !calculate element volume
+    do ne=1,num_elems
+       elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
+            elem_field(ne_length,ne)
+    enddo
+
     call enter_exit(sub_name,2)
 
   END subroutine define_rad_from_file
@@ -1223,11 +1267,17 @@ contains
      elem_field(ne_radius,ne)=radius  
      elem_field(ne_radius_in,ne)=radius
      elem_field(ne_radius_out,ne)=radius
+
+     !element volume
+     elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
+            elem_field(ne_length,ne)
+
      if(diagnostics_level.GT.1)then
 	print *,"element order for element",ne,"=",elem_ordrs(nindex,ne)
      	print *,"radius for element",ne,"=",elem_field(ne_radius,ne)
      	print *,"radius in for element",ne,"=",elem_field(ne_radius_in,ne)
      	print *,"radius out for element",ne,"=",elem_field(ne_radius_out,ne)
+        print *,"volume for element",ne,"=",elem_field(ne_vol,ne)
      endif
     enddo
 
@@ -1288,14 +1338,14 @@ contains
 			orphan_counter = orphan_counter + 1
 			orphan_nodes(orphan_counter) = nn
 		endif
-	ENDDO
-	if(orphan_counter.GT.0)then
+    ENDDO
+    if(orphan_counter.GT.0)then
 		print *, "found",orphan_counter,"node(s) not connected to any elements"
 		do counter=1,orphan_counter
 			print *,"node",orphan_nodes(counter),"is not connected to any elements"
 		enddo
 		call exit(0)
-	endif
+    endif
 
     ! calculate elem_cnct array: stores the connectivity of all elements
     
@@ -1325,7 +1375,7 @@ contains
 	! upstream elements elem_cnct(-1,counter,ne)
 	! total count of downstream elements connected to element ne elem_cnct(1,0,ne)
 	! downstream elements elem_cnct(1,counter,ne)
-	if(diagnostics_level.GT.1)then
+    if(diagnostics_level.GT.1)then
    		DO ne=1,num_elems
    	    		print *,""
    	    		print *,"element",ne 

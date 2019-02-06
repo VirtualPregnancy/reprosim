@@ -1,7 +1,14 @@
 #include "pressure_resistance_flow.h"
 #include "string.h"
 
+void calculate_stats();
 void evaluate_prq_c(const char *mesh_type, int *mesh_type_len, const char *bc_type, int *bc_type_len, double *inlet_flow, double *inlet_pressure, double *outlet_pressure);
+
+
+void calculate_stats()
+{
+  calculate_stats_c();
+}
 
 void evaluate_prq(const char *mesh_type, const char *bc_type, double inlet_flow,double inlet_pressure, double outlet_pressure)
 {

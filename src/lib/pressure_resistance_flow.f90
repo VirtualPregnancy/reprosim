@@ -18,7 +18,7 @@ module pressure_resistance_flow
 
   !Interfaces
   private
-  public evaluate_prq
+  public evaluate_prq, calculate_stats
 contains
 !###################################################################################
 !
@@ -166,7 +166,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
  
  !!! Initialise solution vector based on bcs and rigid vessel resistance
    call tree_resistance(total_resistance)
-   if(diagnostics_level.GT.1)then
+   if(diagnostics_level.GE.1)then
      print *, "total_resistance=",total_resistance
    endif
    call initialise_solution(inletbc,outletbc,(inletbc-outletbc)/total_resistance, &
@@ -323,6 +323,134 @@ subroutine calculate_resistance(viscosity,mesh_type)
 !
 !##################################################################
 !
+subroutine calculate_stats()
+!*Descripton:* This subroutine prints the following statistics for the
+! feto-placental circulation model:
+! arterial, venous, capillary and total vascular volume
+! capillary unit surface area
+! total resistance of vasculature
+! mean, min, max and standard deviation of branch diameter by Strahler order
+! coefficient of variation for terminal flow
+    use indices
+    use arrays,only: num_arterial_elems,dp,num_elems, &
+                  elem_field,num_units,units,elem_cnct,elem_ordrs
+    use other_consts, only: PI
+    use diagnostics, only: enter_exit,get_diagnostics_level
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
+  
+  !local variables
+    integer :: ne, count_elems,nu,nc,order,max_strahler,no_branches, &
+               ne_order,branch
+    real(dp) :: arterial_vasc_volume, total_vasc_volume, capillary_volume, &
+                venous_vasc_volume, single_cap_surface_area, total_cap_surface_area, &
+                mean_diameter,std_diameter,total_resistance,std_terminal_flow, &
+                cof_var_terminal_flow,mean_terminal_flow
+    integer :: strahler_orders(num_elems)
+    real(dp),allocatable :: diameter_by_strahler(:,:)
+    integer,allocatable :: branch_count(:)
+    character(len=60) :: sub_name
+    integer :: diagnostics_level
+
+    sub_name = 'calculate_stats'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+
+
+  !calculate arterial vascular volume
+   arterial_vasc_volume = 0
+   count_elems = 0
+   do ne=1,num_arterial_elems
+      arterial_vasc_volume = arterial_vasc_volume + elem_field(ne_vol,ne)
+      count_elems = count_elems + 1
+   enddo
+   print *, "Arterial elems count",count_elems
+   print *, "Arterial vascular volume (cm**3) = ",arterial_vasc_volume/1000
+
+   capillary_volume = 0
+   count_elems = 0
+   do nu=1,num_units
+      !get the element below a terminal branch - this is the capillary unit
+      ne =units(nu) !Get a terminal unit   
+      nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+      capillary_volume = capillary_volume + elem_field(ne_vol,nc)
+      count_elems = count_elems + 1
+   enddo
+   print *, "Capillary unit count",count_elems
+   print *, "Capillary volume (cm**3) = ",capillary_volume/1000
+
+   total_vasc_volume = 0
+   do ne = 1,num_elems
+      total_vasc_volume = total_vasc_volume + elem_field(ne_vol,ne)
+   enddo
+   print *, "Total vascular volume (cm**3) = ",total_vasc_volume/1000
+
+   venous_vasc_volume = total_vasc_volume - arterial_vasc_volume - capillary_volume  
+   print *, "Venous vascular volume (cm**3) = ",venous_vasc_volume/1000
+
+
+   !calculate capillary unit surface area
+
+   !get one capillary unit
+   ne = units(1)
+   nc = elem_cnct(1,1,ne)
+   !2*PI*radius*length
+   single_cap_surface_area = 2 * PI * elem_field(ne_radius,nc) * elem_field(ne_length,nc) 
+   total_cap_surface_area = single_cap_surface_area * num_units     
+   print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area/100    
+
+   !mean, min, max and std of branch diameter by Strahler order
+
+   strahler_orders(:) = elem_ordrs(3, :)
+   max_strahler = maxval(strahler_orders)
+   allocate(diameter_by_strahler(max_strahler,num_elems))
+   allocate(branch_count(max_strahler))
+   branch_count = 0
+
+   do ne=1,num_elems
+      ne_order = elem_ordrs(3, ne)
+      no_branches = branch_count(ne_order)
+      no_branches = no_branches + 1
+      diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+      branch_count(ne_order) = no_branches
+   enddo
+   print *, "vessel diameter by Strahler order:"
+   print *,"Strahler order,mean diameter,min diameter,max diameter,std"
+   do order=1, max_strahler
+      mean_diameter = sum(diameter_by_strahler(order,:))/branch_count(order)
+      std_diameter = 0
+      do branch=1,branch_count(order)
+          std_diameter = std_diameter + (diameter_by_strahler(order,branch) - mean_diameter)**2
+      enddo
+      std_diameter = std_diameter/branch_count(order)
+      std_diameter = SQRT(std_diameter)
+      print *, order,",",mean_diameter,",",minval(diameter_by_strahler(order,:)),",", &
+            maxval(diameter_by_strahler(order,:)),",",std_diameter    
+   enddo   
+
+   !coefficient of variation for terminal flow
+   !standard deviation of flow devided by the mean flow
+   mean_terminal_flow = 0
+   do nu=1,num_units
+      ne = units(nu)
+      mean_terminal_flow = mean_terminal_flow + elem_field(ne_Qdot,ne)
+   enddo
+   mean_terminal_flow = mean_terminal_flow/num_units
+   std_terminal_flow = 0
+   do nu=1,num_units
+      ne = units(nu)
+      std_terminal_flow = std_terminal_flow + (elem_field(ne_Qdot,ne) - mean_terminal_flow)**2
+   enddo
+   std_terminal_flow = std_terminal_flow/num_units
+   std_terminal_flow = SQRT(std_terminal_flow)
+   cof_var_terminal_flow = std_terminal_flow/mean_terminal_flow
+   print *, "coefficient of variation for terminal flow (%) = ", cof_var_terminal_flow * 100
+
+   call enter_exit(sub_name,2)
+
+end subroutine calculate_stats
+!
+!##################################################################
+!
 subroutine calc_depvar_maps(mesh_from_depvar,depvar_at_elem,depvar_totals,depvar_at_node,mesh_dof,num_vars)
 !*Description:* This subroutine calculates the mapping between the nodes and elements and
 ! the problem dependent variables that are needed for matrix setup and solution
@@ -425,7 +553,7 @@ end subroutine calc_depvar_maps
 !##################################################################
 !
 subroutine tree_resistance(resistance)
-!*Descripton:* This subroutine calculates the total resistance of a tree (arterial tree only)
+!*Descripton:* This subroutine calculates the total resistance of a tree
     use indices
     use arrays,only: dp,num_elems,elem_cnct,elem_field
     use diagnostics, only: enter_exit
