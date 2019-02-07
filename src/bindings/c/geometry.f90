@@ -8,25 +8,23 @@ contains
 !
 !*add_matching_mesh:* Replicates an existing mesh, continuing node and element numbers
   subroutine add_matching_mesh_c(umbilical_elem_option,umbilical_elem_option_len, &
-        UMB_ELEMS_FILE,filename_len) bind(C, name="add_matching_mesh_c")
+        umbilical_element_numbers, umbilical_element_numbers_len) bind(C, name="add_matching_mesh_c")
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
     use other_consts, only: MAX_STRING_LEN,MAX_FILENAME_LEN
     use geometry, only: add_matching_mesh
     implicit none
 
-    integer,intent(in) :: umbilical_elem_option_len, filename_len
-    type(c_ptr), value, intent(in) :: umbilical_elem_option,UMB_ELEMS_FILE
+    integer,intent(in) :: umbilical_elem_option_len, umbilical_element_numbers_len
+    type(c_ptr), value, intent(in) :: umbilical_elem_option
     character(len=MAX_STRING_LEN) :: umbilical_elem_option_f
-    character(len=MAX_FILENAME_LEN) :: filename_f  
-    !integer,intent(in) :: umbilical_elems(20)
+    integer,intent(in) :: umbilical_element_numbers(umbilical_element_numbers_len)
 
     call strncpy(umbilical_elem_option_f, umbilical_elem_option, umbilical_elem_option_len)
-    call strncpy(filename_f, UMB_ELEMS_FILE, filename_len)
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_add_matching_mesh(umbilical_elem_option_f, filename_f)
+    call so_add_matching_mesh(umbilical_elem_option_f, umbilical_element_numbers)
 #else
-    call add_matching_mesh(umbilical_elem_option_f, filename_f)
+    call add_matching_mesh(umbilical_elem_option_f, umbilical_element_numbers)
 #endif
 
   end subroutine add_matching_mesh_c
