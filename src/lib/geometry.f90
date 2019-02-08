@@ -121,7 +121,6 @@ contains
              inlet_counter = inlet_counter + 1
              umb_inlets(inlet_counter) = ne
              if(diagnostics_level.GE.1)then
-                print *,""
                 print *,"umbilical inlet element number =",ne
              endif
           endif
@@ -144,7 +143,6 @@ contains
              inlet_counter = inlet_counter + 1
 	     umb_inlets(inlet_counter) = ne !no upstream elements so this an inlet element
              if(diagnostics_level.GE.1)then
-                print *,""
                 print *,"umbilical inlet element number =",ne
              endif
 	  endif
@@ -640,7 +638,8 @@ contains
   ! and assumed radius, given the number of terminal convolute connections and the number of
   ! generations of symmetric intermediate villous trees 
     use arrays,only: dp,num_units,units,elem_field,elem_direction, &
-                     node_xyz,elem_nodes,elem_cnct
+                     node_xyz,elem_nodes,elem_cnct,num_conv,num_conv_gen, &
+                     cap_resistance,terminal_resistance,terminal_length
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
     use indices, only: ne_length,ne_radius
@@ -650,7 +649,7 @@ contains
     integer, intent(inout) :: num_convolutes,num_generations
 
     real(dp) :: int_length,int_radius,cap_length,cap_radius,seg_length,viscosity, &
-                seg_resistance,cap_resistance,terminal_resistance,total_resistance,cap_unit_radius,total_length
+                seg_resistance,cap_unit_radius
     real(dp) :: int_radius_in, int_radius_out
     real(dp),allocatable :: resistance(:)
     integer :: ne,nu,i,j,np1,np2,nc,nv
@@ -669,7 +668,11 @@ contains
     if (num_generations.LE.0)then
       num_generations = 3
     endif
-    if (diagnostics_level.GE.1)then
+
+    num_conv = num_convolutes
+    num_conv_gen = num_generations
+
+    if (diagnostics_level.GE.2)then
       print *, "num_convolutes=",num_convolutes
       print *, "num_generations=",num_generations
     endif
@@ -691,7 +694,7 @@ contains
     viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
     cap_unit_radius = 0.03_dp
     cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
-	total_resistance = 0
+    terminal_resistance = 0
 	
 
     do j=1,num_generations
@@ -704,21 +707,21 @@ contains
       do i=2,num_convolutes
         resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1))
       enddo
-      terminal_resistance = resistance(num_convolutes) !Pa . s per mm^3 total resistance of terminal capillary conduits
+      cap_resistance = resistance(num_convolutes) !Pa . s per mm^3 total resistance of terminal capillary conduits
 	
       !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
       !of the system by summing the resistance of each generation
 
-      total_resistance = total_resistance + terminal_resistance/2**j
+      terminal_resistance = terminal_resistance + cap_resistance/2**j
     enddo
 
-    total_length = total_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
+    terminal_length = terminal_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
 
-    if(diagnostics_level.GE.1)then
-      print *, "resistance of a capillary conduit=",terminal_resistance
-      print *, "resistance of all generations of capillaries per terminal unit=",total_resistance
-      print *, "effective length of each capillary unit (mm)",total_length
-      print *, "Total capillary length for the vasculature (cm)",(total_length*num_units)/10
+    if(diagnostics_level.GE.2)then
+      print *, "Resistance of capillary conduits=",cap_resistance
+      print *, "Resistance of all generations of capillaries per terminal unit=",terminal_resistance
+      print *, "Effective length of each terminal unit (mm)",terminal_length
+      print *, "Total capillary length for the vasculature (cm)",(terminal_length*num_units)/10
     endif
 
     !set the effective length of each capillary unit based the total resistance of capillary convolutes   
@@ -728,7 +731,7 @@ contains
       !update element radius
       elem_field(ne_radius,nc) = cap_unit_radius
       !update element length   
-      elem_field(ne_length,nc) = total_length
+      elem_field(ne_length,nc) = terminal_length
       !update element direction
       np1=elem_nodes(1,nc)
       np2=elem_nodes(2,nc)

@@ -166,7 +166,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
  
  !!! Initialise solution vector based on bcs and rigid vessel resistance
    call tree_resistance(total_resistance)
-   if(diagnostics_level.GE.1)then
+   if(diagnostics_level.GE.2)then
      print *, "total_resistance=",total_resistance
    endif
    call initialise_solution(inletbc,outletbc,(inletbc-outletbc)/total_resistance, &
@@ -333,7 +333,9 @@ subroutine calculate_stats()
 ! coefficient of variation for terminal flow
     use indices
     use arrays,only: num_arterial_elems,dp,num_elems, &
-                  elem_field,num_units,units,elem_cnct,elem_ordrs
+                  elem_field,num_units,units,elem_cnct,elem_ordrs, &
+                  num_conv,num_conv_gen,cap_resistance,terminal_resistance, &
+                  terminal_length,total_vasc_resistance
     use other_consts, only: PI
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
@@ -387,6 +389,17 @@ subroutine calculate_stats()
    venous_vasc_volume = total_vasc_volume - arterial_vasc_volume - capillary_volume  
    print *, "Venous vascular volume (cm**3) = ",venous_vasc_volume/1000
 
+
+   !Print capillary convolute number, generations and total length of capillaries
+   print *, "Number of capillary convolutes per generation = ",num_conv
+   print *, "Number of capillary generations per terminal unit = ",num_conv_gen
+   print *, "Resistance of capillary conduits=",cap_resistance
+   print *, "Resistance of all generations of capillaries per terminal unit=",terminal_resistance
+   print *, "Effective length of each terminal unit (mm)",terminal_length
+   print *, "Total capillary length for the vasculature (cm)",(terminal_length*num_units)/10
+
+   !total vascular resistance
+   print *, "Total vascular resistance = ",total_vasc_resistance
 
    !calculate capillary unit surface area
 
@@ -555,7 +568,8 @@ end subroutine calc_depvar_maps
 subroutine tree_resistance(resistance)
 !*Descripton:* This subroutine calculates the total resistance of a tree
     use indices
-    use arrays,only: dp,num_elems,elem_cnct,elem_field
+    use arrays,only: dp,num_elems,elem_cnct,elem_field,&
+                     total_vasc_resistance
     use diagnostics, only: enter_exit
     character(len=60) :: sub_name
 !local variables
@@ -579,6 +593,7 @@ subroutine tree_resistance(resistance)
        endif
     enddo
     resistance=elem_res(1)
+    total_vasc_resistance = resistance
 
     call enter_exit(sub_name,2)
 end subroutine tree_resistance
