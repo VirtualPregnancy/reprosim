@@ -297,7 +297,6 @@ contains
        elem_counter = elem_counter + 1
 
        if(diagnostics_level.GE.1)then
-           print *,""
            print *,"umbilical outlet element number =",umb_ven_elems(1)
        endif       
 
@@ -362,7 +361,6 @@ contains
        do inlet_counter=1,2
           umb_elem = umb_inlets(inlet_counter)
           if(umb_elem.GT.0)then
-             print *,""
              print *,"umbilical outlet element number",ne_map(umb_elem)
           endif
        enddo
