@@ -56,7 +56,8 @@ contains
             downstream_elem, node_counter, elem_counter, indx, elem_at_node, indx2, &
             nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter, &
             max_ne, max_elem_indx,umb_node_counter,node_no,no_umb_art_nodes, umb_elem,&
-            inlet_counter,outlet_counter,j,umb_elems_count,umb_elem_indx,ierror,ntemp,dwn_elems 
+            inlet_counter,outlet_counter,j,umb_elems_count,umb_elem_indx,ierror,ntemp,dwn_elems, &
+            inlet1_np1,inlet2_np1 
     integer, allocatable :: np_map(:)
     integer, allocatable :: ne_map(:)
     integer :: umb_inlets(2) = 0
@@ -233,9 +234,11 @@ contains
        if(count(umb_inlets.NE.0).GT.1)then
           np=np_global+node_counter
           umb_ven_nodes(4) = np
-          nodes(np0+node_counter)=np   
+          nodes(np0+node_counter)=np
+          inlet1_np1 = elem_nodes(1,umb_inlets(1)) 
+          inlet2_np1 = elem_nodes(1,umb_inlets(2))    
           do nj=1,3
-             node_xyz(nj,np)=(node_xyz(nj,umb_inlets(1))+node_xyz(nj,umb_inlets(2)))/2 + offset(nj)
+             node_xyz(nj,np)=(node_xyz(nj,inlet1_np1)+node_xyz(nj,inlet2_np1))/2 + offset(nj)
           enddo
           node_counter = node_counter + 1  
 
@@ -243,9 +246,10 @@ contains
           !if one inlet copy the first node
           np=np_global+node_counter
           umb_ven_nodes(4) = np
-          nodes(np0+node_counter)=np   
+          nodes(np0+node_counter)=np  
+          np1 = elem_nodes(1,umb_inlets(1)) 
           do nj=1,3
-             node_xyz(nj,np)=node_xyz(nj,umb_inlets(1)) + offset(nj)
+             node_xyz(nj,np)=node_xyz(nj,np1) + offset(nj)
           enddo
           node_counter = node_counter + 1  
 
@@ -497,6 +501,7 @@ contains
           elem_direction(j,ne) = (node_xyz(j,np2) - &
                node_xyz(j,np1))/elem_field(ne_length,ne)           
        enddo
+
     enddo
 
   
@@ -634,21 +639,22 @@ contains
   subroutine calc_capillary_unit_length(num_convolutes,num_generations)
   !*Description:* Calculates the effective length of a capillary unit based on its total resistance
   ! and assumed radius, given the number of terminal convolute connections and the number of
-  ! generations of symmetric intermediate villous trees 
+  ! generations of symmetric intermediate villous branches 
     use arrays,only: dp,num_units,units,elem_field,elem_direction, &
                      node_xyz,elem_nodes,elem_cnct,num_conv,num_conv_gen, &
-                     cap_resistance,terminal_resistance,terminal_length
+                     cap_resistance,terminal_resistance,terminal_length, &
+                     cap_radius 
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
-    use indices, only: ne_length,ne_radius
+    use indices, only: ne_length,ne_radius,ne_vol
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
 
     integer, intent(inout) :: num_convolutes,num_generations
 
-    real(dp) :: int_length,int_radius,cap_length,cap_radius,seg_length,viscosity, &
-                seg_resistance,cap_unit_radius
-    real(dp) :: int_radius_in, int_radius_out
+    real(dp) :: int_length,int_radius,seg_length,viscosity, &
+                seg_resistance,cap_unit_radius, cap_length
+    real(dp) :: int_radius_in,int_radius_out
     real(dp),allocatable :: resistance(:)
     integer :: ne,nu,i,j,np1,np2,nc,nv
     integer :: AllocateStatus
@@ -737,6 +743,11 @@ contains
         elem_direction(j,nc) = (node_xyz(j,np2) - &
                node_xyz(j,np1))/elem_field(ne_length,nc)           
       enddo
+
+      !update element volume
+      elem_field(ne_vol,nc) = PI * elem_field(ne_radius,nc)**2 * &
+            elem_field(ne_length,nc)
+
     enddo
 
     call enter_exit(sub_name,2)
@@ -856,6 +867,7 @@ contains
           elem_direction(j,ne) = (node_xyz(j,np2) - &
                node_xyz(j,np1))/elem_field(ne_length,ne)           
        enddo !j
+
     enddo
 
     call element_connectivity_1d
@@ -1153,6 +1165,7 @@ contains
        elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
             elem_field(ne_length,ne)
     enddo
+   
 
     call enter_exit(sub_name,2)
 
@@ -1259,6 +1272,7 @@ contains
      !element volume
      elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
             elem_field(ne_length,ne)
+
 
      if(diagnostics_level.GT.1)then
 	print *,"element order for element",ne,"=",elem_ordrs(nindex,ne)

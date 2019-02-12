@@ -26,7 +26,7 @@ module arrays
   real(dp),allocatable :: node_field(:,:)
 
   real(dp) :: cap_resistance,terminal_resistance,terminal_length, &
-              total_vasc_resistance
+              total_vasc_resistance,cap_radius
 
 ! temporary, for debugging:
   real(dp) :: unit_before
@@ -36,7 +36,7 @@ module arrays
     num_nodes, units, num_units, unit_field, node_field, dp, elem_cnct, elem_ordrs, elem_direction, &
     elems_at_node, elem_symmetry, elem_units_below, maxgen, num_arterial_elems, &
     num_conv,num_conv_gen,cap_resistance,terminal_resistance,terminal_length, &
-    total_vasc_resistance
+    total_vasc_resistance,cap_radius
 
 contains
   subroutine set_node_field_value(row, col, value)  
