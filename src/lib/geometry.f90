@@ -141,11 +141,11 @@ contains
        do noelem=1,umb_elems_count
 	  ne = umbilical_elems(noelem)
 	  if(elem_cnct(-1,0,ne).EQ.0)then
-             inlet_counter = inlet_counter + 1
-	     umb_inlets(inlet_counter) = ne !no upstream elements so this an inlet element
-             if(diagnostics_level.GE.1)then
-                print *,"umbilical inlet element number =",ne
-             endif
+        inlet_counter = inlet_counter + 1
+	    umb_inlets(inlet_counter) = ne !no upstream elements so this an inlet element
+        if(diagnostics_level.GE.1)then
+          print *,"umbilical inlet element number =",ne
+        endif
 	  endif
           !look for umbilical outlets = elements whose downstream elements are not umbilical elements themselves
           dwn_elems = elem_cnct(1,0,ne) !number of downstream elements
@@ -617,10 +617,12 @@ contains
     ENDDO
 
     ! count the effective number of elements below each branch
-    do ne=num_elems,2,-1
+    do ne=num_elems,1,-1
        ne0=elem_cnct(-1,1,ne)
+       if(ne0.gt.0)then !not an inlet
        elem_units_below(ne0) = elem_units_below(ne0) &
             + elem_units_below(ne)*elem_symmetry(ne)
+       endif
     enddo !ne
 	
 	if(diagnostics_level.GT.1)then
