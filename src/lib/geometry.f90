@@ -1231,10 +1231,10 @@ contains
            			inlet_count=inlet_count+1
            			ne_start=ne
          		endif
-         		if(inlet_count.gt.1)then
-            			WRITE(*,*) ' More than one inlet in this group, using last found, ne = ',ne
-         		endif
       		enddo
+      		if(inlet_count.gt.1)then
+               WRITE(*,*) ' More than one inlet in this group, using last found, ne = ',ne_start
+            endif
     		else!element number defined
        		read (START_FROM,'(I10)') ne_start
     		endif
@@ -1297,7 +1297,7 @@ contains
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ELEMENT_CONNECTIVITY_1D" :: ELEMENT_CONNECTIVITY_1D
   
     !     Local Variables
-    integer :: ne,ne2,nn,noelem,np,np2,np1,counter,orphan_counter
+    integer :: ne,ne2,ne3,i,nn,noelem,np,np2,np1,counter,orphan_counter
     integer,parameter :: NNT=2
     character(len=60) :: sub_name
     integer :: orphan_nodes(num_nodes)
@@ -1321,7 +1321,9 @@ contains
           elems_at_node(np,elems_at_node(np,0))=ne ! local element that np is in
         ENDDO !nn
     ENDDO !noelem
-
+    !do nn = 1,10
+    !  write(*,*) 'node', nn, elems_at_node(nn,0)
+    !enddo
     if(diagnostics_level.GT.1)then
     		DO nn=1,num_nodes
        		print *," "
@@ -1358,14 +1360,22 @@ contains
        IF(NNT == 2) THEN !1d
           np1=elem_nodes(1,ne) !first local node
           np2=elem_nodes(2,ne) !second local node
-
           DO noelem=1,elems_at_node(np2,0) !for each element connected to node np2
              ne2=elems_at_node(np2,noelem) !get the element number connected to node np2
+             do i = 1,elem_cnct(1,0,ne2)
+               ne3 = elem_cnct(1,i,ne2)
+               if(ne.lt.5)write(*,*)'ne3',ne3
+               if(ne3 == ne)then !element is already upstream of this one
+                 ne2 = ne
+               endif
+             enddo
              IF(ne2 /= ne)THEN !if element connected to node np2 is not the current element ne
-                elem_cnct(-1,0,ne2)=elem_cnct(-1,0,ne2)+1
-                elem_cnct(-1,elem_cnct(-1,0,ne2),ne2)=ne !previous element              
-                elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1
-                elem_cnct(1,elem_cnct(1,0,ne),ne)=ne2
+                  elem_cnct(-1,0,ne2)=elem_cnct(-1,0,ne2)+1
+                  elem_cnct(-1,elem_cnct(-1,0,ne2),ne2)=ne !previous element
+                  elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1
+                  elem_cnct(1,elem_cnct(1,0,ne),ne)=ne2
+
+                  if(ne2.eq.2) write(*,*) ne,ne2,ne3
              ENDIF !ne2
           ENDDO !noelem2
 
@@ -1377,6 +1387,10 @@ contains
 	! upstream elements elem_cnct(-1,counter,ne)
 	! total count of downstream elements connected to element ne elem_cnct(1,0,ne)
 	! downstream elements elem_cnct(1,counter,ne)
+	do ne = 1,10
+	  write(*,*) ne, elem_cnct(-1,0,ne)
+
+	enddo
     if(diagnostics_level.GT.1)then
    		DO ne=1,num_elems
    	    		print *,""

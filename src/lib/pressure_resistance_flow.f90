@@ -160,10 +160,10 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
     allocate (solver_solution(MatrixSize), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory for solver_solution array ***"
     !calculate the sparsity structure
-	!call calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem, &
-    !    depvar_at_node,NonZeros,MatrixSize,SparseCol,SparseRow,SparseVal,RHS, &
-    !    prq_solution)
-    if(bc_type.ne.'multi_inlet_pressure')then
+	call calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem, &
+        depvar_at_node,NonZeros,MatrixSize,SparseCol,SparseRow,SparseVal,RHS, &
+        prq_solution)
+    !if(bc_type.ne.'multi_inlet_pressure')then
  !!! Initialise solution vector based on bcs and rigid vessel resistance
    call tree_resistance(total_resistance)
    if(diagnostics_level.GE.2)then
@@ -196,13 +196,14 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
 		   prq_solution(depvar)=solver_solution(no) !pressure & flow solutions
        endif
    enddo
-    
+     !endif !Alys temp trying to set bcs
 !need to write solution to element/nodal fields for export
     call map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_dof)
+
     !NEED TO UPDATE TERMINAL SOLUTION HERE. LOOP THO' UNITS AND TAKE FLOW AND PRESSURE AT TERMINALS
     call map_flow_to_terminals
 
-    endif !Alys temp trying to set bcs
+
 
     deallocate (mesh_from_depvar, STAT = AllocateStatus)
     deallocate (depvar_at_elem, STAT = AllocateStatus)
@@ -250,13 +251,16 @@ depvar_at_elem,prq_solution,mesh_dof,mesh_type)
      ! These are inlet BCs, apply to all inlet BCs (there should only be one)
      do ne=1,num_elems
         !ne=elems(noelem)
+        if(ne.lt.10)write(*,*), ne, elem_cnct(-1,0,ne)
         if (elem_cnct(-1,0,ne) == 0) THEN !Entry element
-           if(BC_TYPE == 'pressure')THEN          
+        write(*,*) ne, bc_type
+           if(bc_type.eq.'pressure'.or.bc_type.eq.'multi_inlet_pressure')THEN
               np=elem_nodes(1,ne)
               ny1=depvar_at_node(np,1,1) !for fixed pressure BC
               FIX(ny1)=.TRUE. !set fixed
               prq_solution(ny1)=inletbc !Putting BC value into solution array
-           else if(BC_TYPE == 'flow')THEN
+              write(*,*) 'fixing',ny1,inletbc
+           else if(bc_type.eq.'flow')THEN
               ny1=depvar_at_elem(0,1,ne) !fixed
               FIX(ny1)=.TRUE. !set fixed
               prq_solution(ny1)=inletbc !Putting BC value into solution array
@@ -801,6 +805,8 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
  	
  	fixed_pressures = fixed_variables - fixed_flows
  	
+ 	write(*,*) 'fixed', fixed_variables, fixed_pressures, fixed_flows
+
  	!count of pressure equations = (number of elements * 3 variables in each equation) - fixed pressures - fixed flows
  	NonZeros = num_elems*3 - fixed_pressures - fixed_flows
  	!count of conservation of flow equations = sum of elements connected to nodes which have at least 2 connected elements - fixed flows
