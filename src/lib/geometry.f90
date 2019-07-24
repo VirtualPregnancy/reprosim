@@ -66,8 +66,10 @@ contains
     integer :: umb_ven_elems(3) = 0 !umbilical venous elements
     integer :: umb_ven_nodes(4) = 0 !umbilical venous nodes
     integer, allocatable :: umb_art_nodes(:)
+    integer, allocatable :: umb_art_nodes_tmp(:)
+    integer, allocatable :: umb_art_nodes_tmp2(:)
     integer :: umbilical_elems(20) = 0
-    integer :: index
+    integer :: index, i
     character(LEN=132) :: ctemp1
 
     character(len=60) :: sub_name
@@ -132,7 +134,38 @@ contains
        !populate the umbilical arterial nodes array and
        !find the inlet(s) and outlets in the umbilical elements
 
-       allocate(umb_art_nodes(umb_elems_count + 1))
+       !Count the number of nodes attached to the umbilical arteries
+       allocate(umb_art_nodes_tmp(umb_elems_count*2))
+       allocate(umb_art_nodes_tmp2(umb_elems_count*2))
+       umb_node_counter = 0
+       do noelem=1,umb_elems_count
+         ne = umbilical_elems(noelem)
+         do node_no=1,2
+           umb_node_counter = umb_node_counter + 1
+           np = elem_nodes(node_no,ne)
+           umb_art_nodes_tmp(umb_node_counter) = np
+         enddo
+       enddo
+
+       !The following 14 lines are modified from https://www.rosettacode.org/wiki/Remove_duplicate_elements
+       umb_node_counter = 1
+       umb_art_nodes_tmp2(1) = umb_art_nodes_tmp(1)
+       outer: do i=2,size(umb_art_nodes_tmp)
+         do j=1,umb_node_counter
+          if (umb_art_nodes_tmp2(j) == umb_art_nodes_tmp(i)) then
+           ! Found a match so start looking again
+           cycle outer
+        endif
+        enddo
+        ! No match found so add it to the output
+        umb_node_counter = umb_node_counter + 1
+        umb_art_nodes_tmp2(umb_node_counter) = umb_art_nodes_tmp(i)
+      end do outer
+
+
+       allocate(umb_art_nodes(umb_node_counter)) !ARC: we might be able to just define umb_art_nodes here from the above, but I leave as i havent checked if ordering matters
+       deallocate(umb_art_nodes_tmp)
+       deallocate(umb_art_nodes_tmp2)
        umb_art_nodes = 0
 
        inlet_counter = 0
