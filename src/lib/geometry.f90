@@ -15,6 +15,7 @@ module geometry
   public add_matching_mesh
   public append_units
   public calc_capillary_unit_length
+  public define_anast
   public define_1d_elements
   public define_node_geometry
   public define_rad_from_file
@@ -176,9 +177,9 @@ contains
 	     if(elem_cnct(-1,0,ne).EQ.0)then
            inlet_counter = inlet_counter + 1
 	       umb_inlets(inlet_counter) = ne !no upstream elements so this an inlet element
-           !if(diagnostics_level.GE.1)then
-           print *,"umbilical inlet element number =",ne
-          !endif
+           if(diagnostics_level.GE.1)then
+             print *,"umbilical inlet element number =",ne
+           endif
 	     endif
           !look for umbilical outlets = elements whose downstream elements are not umbilical elements themselves
          dwn_elems = elem_cnct(1,0,ne) !number of downstream elements
@@ -787,6 +788,31 @@ contains
     call enter_exit(sub_name,2)
 
   end subroutine calc_capillary_unit_length
+!
+!###################################################################################
+!
+  subroutine define_anast(elem_number)
+    !*Description:* Lets the code know there is an anastomosis and where it is
+    use arrays, only: anastomosis, anastomosis_elem
+    use diagnostics, only: enter_exit,get_diagnostics_level
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_ANAST" :: DEFINE_ANAST
+    integer, intent(in) :: elem_number
+
+    character(len=60) :: sub_name
+    integer:: diagnostics_level
+
+    sub_name = 'define_anast'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+
+    anastomosis = .TRUE.
+    anastomosis_elem = elem_number
+
+    call enter_exit(sub_name,2)
+
+  end subroutine define_anast
+
 !
 !###################################################################################
 !

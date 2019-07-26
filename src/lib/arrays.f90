@@ -4,6 +4,7 @@ module arrays
 
   implicit none
 
+
   integer :: num_elems,num_nodes,num_units,maxgen,num_arterial_elems, &
              num_conv,num_conv_gen
   
@@ -19,6 +20,10 @@ module arrays
   integer,allocatable :: elems_at_node(:,:)
   integer,allocatable :: units(:)
 
+  integer :: anastomosis_elem
+
+  logical :: anastomosis = .FALSE.
+
   real(dp),allocatable :: elem_field(:,:) !properties of elements
   real(dp),allocatable :: elem_direction(:,:)
   real(dp),allocatable :: node_xyz(:,:)
@@ -28,11 +33,12 @@ module arrays
   real(dp) :: cap_resistance,terminal_resistance,terminal_length, &
               total_vasc_resistance,cap_radius
 
+
 ! temporary, for debugging:
   real(dp) :: unit_before
 
   private
-  public set_node_field_value, elem_field, num_elems, elem_nodes, node_xyz, nodes, elems, &
+  public anastomosis, anastomosis_elem, set_node_field_value, elem_field, num_elems, elem_nodes, node_xyz, nodes, elems, &
     num_nodes, units, num_units, unit_field, node_field, dp, elem_cnct, elem_ordrs, elem_direction, &
     elems_at_node, elem_symmetry, elem_units_below, maxgen, num_arterial_elems, &
     num_conv,num_conv_gen,cap_resistance,terminal_resistance,terminal_length, &

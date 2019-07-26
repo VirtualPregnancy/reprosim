@@ -63,7 +63,22 @@ contains
 #endif
 
   end subroutine calc_capillary_unit_length_c
+!
+!###################################################################################
+!
+  subroutine define_anast_c(elem_number) bind(C, name="define_anast_c")
 
+    use geometry, only: define_anast
+    implicit none
+
+    integer, intent(in) :: elem_number
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_define_anast(elem_number)
+#else
+    call define_anast(elem_number)
+#endif
+
+  end subroutine define_anast_c
 !
 !###################################################################################
 !
