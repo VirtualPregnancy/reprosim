@@ -251,15 +251,12 @@ depvar_at_elem,prq_solution,mesh_dof,mesh_type)
      ! These are inlet BCs, apply to all inlet BCs (there should only be one)
      do ne=1,num_elems
         !ne=elems(noelem)
-        if(ne.lt.10)write(*,*), ne, elem_cnct(-1,0,ne)
         if (elem_cnct(-1,0,ne) == 0) THEN !Entry element
-        write(*,*) ne, bc_type
            if(bc_type.eq.'pressure'.or.bc_type.eq.'multi_inlet_pressure')THEN
               np=elem_nodes(1,ne)
               ny1=depvar_at_node(np,1,1) !for fixed pressure BC
               FIX(ny1)=.TRUE. !set fixed
               prq_solution(ny1)=inletbc !Putting BC value into solution array
-              write(*,*) 'fixing',ny1,inletbc
            else if(bc_type.eq.'flow')THEN
               ny1=depvar_at_elem(0,1,ne) !fixed
               FIX(ny1)=.TRUE. !set fixed
@@ -804,8 +801,6 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
  	enddo
  	
  	fixed_pressures = fixed_variables - fixed_flows
- 	
- 	write(*,*) 'fixed', fixed_variables, fixed_pressures, fixed_flows
 
  	!count of pressure equations = (number of elements * 3 variables in each equation) - fixed pressures - fixed flows
  	NonZeros = num_elems*3 - fixed_pressures - fixed_flows
