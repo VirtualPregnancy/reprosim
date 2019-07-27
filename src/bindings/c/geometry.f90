@@ -63,7 +63,22 @@ contains
 #endif
 
   end subroutine calc_capillary_unit_length_c
+!
+!###################################################################################
+!
+  subroutine define_anast_c(elem_number) bind(C, name="define_anast_c")
 
+    use geometry, only: define_anast
+    implicit none
+
+    integer, intent(in) :: elem_number
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_define_anast(elem_number)
+#else
+    call define_anast(elem_number)
+#endif
+
+  end subroutine define_anast_c
 !
 !###################################################################################
 !
@@ -209,6 +224,21 @@ contains
 !
 !###################################################################################
 !
+subroutine update_1d_elem_field_c(ne_field, elem_number,value) &
+   bind(C, name="update_1d_elem_field_c")
+    use geometry, only: update_1d_elem_field
+    use arrays, only: dp
+    implicit none
+    integer, intent(in) :: ne_field
+    integer, intent(in) :: elem_number
+    real(dp), intent(in) :: value
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_update_1d_elem_field(ne_field,elem_number,value)
+#else
+    call update_1d_elem_field(ne_field,elem_number,value)
+#endif
+end subroutine update_1d_elem_field_c
 
 end module geometry_c
 

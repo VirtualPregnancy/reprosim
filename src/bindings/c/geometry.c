@@ -6,6 +6,7 @@
 extern void add_matching_mesh_c(const char *umbilical_elem_option, int *umbilical_elem_option_len, int umbilical_element_numbers[], int *umbilical_element_numbers_len);
 void append_units_c();
 void calc_capillary_unit_length_c(int *num_convolutes, int *num_generations);
+void define_anast_c(int *elem_number);
 void define_1d_elements_c(const char *ELEMFILE, int *filename_len);
 void define_node_geometry_c(const char *NODEFILE, int *filename_len);
 void define_rad_from_file_c(const char *FIELDFILE, int *filename_len, const char *order_system, 
@@ -15,6 +16,7 @@ void define_rad_from_geom_c(const char *order_system, int *order_system_len, dou
                             const char *group_type, int *group_type_len, const char *group_options, int *group_options_len);
 void element_connectivity_1d_c();
 void evaluate_ordering_c();
+void update_1d_elem_field_c(int *ne_field, int *elem_number, double *value);
 
 
 void add_matching_mesh(const char *umbilical_elem_option, int umbilical_element_numbers_len, int umbilical_element_numbers[])
@@ -31,6 +33,11 @@ void append_units()
 void calc_capillary_unit_length(int num_convolutes, int num_generations)
 {
   calc_capillary_unit_length_c(&num_convolutes,&num_generations);
+}
+
+void define_anast(int elem_number)
+{
+	define_anast_c(&elem_number);
 }
 
 void define_1d_elements(const char *ELEMFILE)
@@ -72,4 +79,9 @@ void element_connectivity_1d()
 void evaluate_ordering()
 {
   evaluate_ordering_c();
+}
+
+void update_1d_elem_field(int ne_field, int elem_number, double value)
+{
+  update_1d_elem_field_c(&ne_field, &elem_number, &value);
 }
