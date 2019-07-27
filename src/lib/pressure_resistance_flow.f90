@@ -439,10 +439,12 @@ subroutine calculate_stats()
 
    do ne=1,num_elems
       ne_order = strahler_orders(ne)
-      no_branches = branch_count(ne_order)
-      no_branches = no_branches + 1
-      diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-      branch_count(ne_order) = no_branches
+      if(ne_order.ge.1)then
+        no_branches = branch_count(ne_order)
+        no_branches = no_branches + 1
+        diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+        branch_count(ne_order) = no_branches
+      endif
    enddo
    print *, "Vessel diameter (mm) by Strahler order:"
    print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
@@ -466,10 +468,12 @@ subroutine calculate_stats()
    branch_count = 0
    do ne=1,num_arterial_elems
       ne_order = strahler_orders(ne)
-      no_branches = branch_count(ne_order)
-      no_branches = no_branches + 1
-      art_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-      branch_count(ne_order) = no_branches
+      if(ne_order.ge.1)then
+        no_branches = branch_count(ne_order)
+        no_branches = no_branches + 1
+        art_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+        branch_count(ne_order) = no_branches
+      endif
    enddo
    print *, "Arterial vessel diameter (mm) by Strahler order:"
    print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
@@ -505,10 +509,12 @@ subroutine calculate_stats()
       do ne=num_arterial_elems+1,num_elems
          if(ALL(capillaries.NE.ne))then !if the element is not a capillary
             ne_order = strahler_orders(ne)
-            no_branches = branch_count(ne_order)
-            no_branches = no_branches + 1
-            ven_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-            branch_count(ne_order) = no_branches
+            if(ne_order.ge.1)then
+              no_branches = branch_count(ne_order)
+              no_branches = no_branches + 1
+              ven_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+              branch_count(ne_order) = no_branches
+            endif
          endif
       enddo
       print *, "Venous vessel diameter (mm) by Strahler order:"

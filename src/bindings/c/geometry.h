@@ -15,5 +15,6 @@ SHO_PUBLIC void define_rad_from_geom(const char *ORDER_SYSTEM, double CONTROL_PA
                                      double START_RAD, const char *GROUP_TYPE, const char *GROUP_OPTIONS);
 SHO_PUBLIC void element_connectivity_1d();
 SHO_PUBLIC void evaluate_ordering();
+SHO_PUBLIC void update_1d_elem_field(int ne_field, int elem_number, double value);
 
 #endif /* REPROSIM_GEOMETRY_H */

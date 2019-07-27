@@ -23,6 +23,7 @@ module geometry
   public element_connectivity_1d
   public evaluate_ordering
   public get_final_real
+  public update_1d_elem_field
 
 contains
 !
@@ -809,6 +810,11 @@ contains
     anastomosis = .TRUE.
     anastomosis_elem = elem_number
 
+    if(diagnostics_level.gt.1)then
+      print *, "Defining anastomoses", elem_number
+    endif
+
+
     call enter_exit(sub_name,2)
 
   end subroutine define_anast
@@ -1472,7 +1478,7 @@ contains
   !*Description:* calculates generations, Horsfield orders, Strahler orders for a given tree
    
     use arrays,only: elem_cnct,elem_nodes,elem_ordrs,elem_symmetry,&
-         elems_at_node,num_elems,num_nodes,maxgen
+         elems_at_node,num_elems,num_nodes,maxgen,anastomosis,anastomosis_elem
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
     !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_ORDERING" :: EVALUATE_ORDERING
@@ -1514,34 +1520,46 @@ contains
 
     !.....Calculate the branch orders
     DO ne=num_elems,1,-1
-       n_horsfield=MAX(elem_ordrs(2,ne),1)
-       n_children=elem_cnct(1,0,ne) !number of child branches
-       IF(n_children.EQ.1)THEN
-          IF(elem_ordrs(1,elem_cnct(1,1,ne)).EQ.0)  n_children=0
-       ENDIF
-       STRAHLER=0
-       STRAHLER_ADD=1
-       IF(n_children.GE.2)THEN !branch has two or more daughters
-          STRAHLER=elem_ordrs(3,elem_cnct(1,1,ne)) !first daughter
-          DO noelem2=1,n_children !for all daughters
+       if((.not.anastomosis).or.(ne /= anastomosis_elem)) then
+         if(diagnostics_level.GT.1)then
+           print *, 'ne (should be skipping anast)',ne,anastomosis,anastomosis_elem
+         endif
+         n_horsfield=MAX(elem_ordrs(2,ne),1)
+         n_children=elem_cnct(1,0,ne) !number of child branches
+         IF(n_children.EQ.1)THEN
+           IF(elem_ordrs(1,elem_cnct(1,1,ne)).EQ.0)  n_children=0
+         ENDIF
+         STRAHLER=0
+         STRAHLER_ADD=1
+         IF(n_children.GE.2)THEN !branch has two or more daughters
+           STRAHLER=elem_ordrs(3,elem_cnct(1,1,ne)) !first daughter
+           DO noelem2=1,n_children !for all daughters
              ne2=elem_cnct(1,noelem2,ne) !global element # of daughter
-             temp1=elem_ordrs(2,ne2) !Horsfield order of daughter
-             IF(temp1.GT.n_horsfield) n_horsfield=temp1
-             IF(elem_ordrs(3,ne2).LT.STRAHLER)THEN
-                STRAHLER_ADD=0
-             ELSE IF(elem_ordrs(3,ne2).GT.STRAHLER)THEN
-                STRAHLER_ADD=0
-                STRAHLER=elem_ordrs(3,ne2) !highest daughter
-             ENDIF
-          ENDDO !noelem2 (ne2)
-          n_horsfield=n_horsfield+1 !Horsfield ordering
-       ELSE IF(n_children.EQ.1)THEN
-          ne2=elem_cnct(1,1,ne) !local element # of daughter
-          n_horsfield=elem_ordrs(2,ne2)+(elem_symmetry(ne)-1)
-          STRAHLER_ADD=elem_ordrs(3,ne2)+(elem_symmetry(ne)-1)
-       ENDIF !elem_cnct
-       elem_ordrs(2,ne)=n_horsfield !store the Horsfield order
-       elem_ordrs(3,ne)=STRAHLER+STRAHLER_ADD !Strahler order
+             if((.not.anastomosis).or.(ne2 /= anastomosis_elem)) then
+               temp1=elem_ordrs(2,ne2) !Horsfield order of daughter
+               IF(temp1.GT.n_horsfield) n_horsfield=temp1
+               IF(elem_ordrs(3,ne2).LT.STRAHLER)THEN
+                 STRAHLER_ADD=0
+               ELSE IF(elem_ordrs(3,ne2).GT.STRAHLER)THEN
+                 STRAHLER_ADD=0
+                 STRAHLER=elem_ordrs(3,ne2) !highest daughter
+               ENDIF
+             endif !not anast (ne2)
+           ENDDO !noelem2 (ne2)
+           n_horsfield=n_horsfield+1 !Horsfield ordering
+         ELSEIF(n_children.EQ.1)THEN
+           ne2=elem_cnct(1,1,ne) !local element # of daughter
+           if((.not.anastomosis).or.(ne2 /= anastomosis_elem)) then
+             n_horsfield=elem_ordrs(2,ne2)+(elem_symmetry(ne)-1)
+             STRAHLER_ADD=elem_ordrs(3,ne2)+(elem_symmetry(ne)-1)
+           endif !not anast (ne2)
+         ENDIF !elem_cnct
+         elem_ordrs(2,ne)=n_horsfield !store the Horsfield order
+         elem_ordrs(3,ne)=STRAHLER+STRAHLER_ADD !Strahler order
+       else !as a placeholder assign an order of 0 to the anastomosis elt
+        elem_ordrs(2,ne)=0 !store the Horsfield order
+        elem_ordrs(3,ne)=0 !Strahler order
+       endif !not anast
     ENDDO !noelem
 
     !       Check for disconnected nodes and number of inlets and outlets
@@ -1705,6 +1723,41 @@ contains
 !
 !###################################################################################
 !
+
+subroutine update_1d_elem_field(ne_field,elem_number,value)
+
+    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
+    use arrays,only: dp,elem_field,num_elems
+    use indices,only: num_ne
+    use diagnostics, only: enter_exit, get_diagnostics_level
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_UPDATE_1D_ELEM_FIELD" :: UPDATE_1D_ELEM_FIELD
+
+!!! Parameters
+    integer, intent(in) :: ne_field
+    integer, intent(in) :: elem_number
+    real(dp), intent(in) :: value
+
+    character(len=60) :: sub_name
+    integer :: diagnostics_level
+
+    sub_name = 'update_1d_elem_field'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+
+    if(ne_field.gt.num_ne)then
+      print *, 'WARNING: trying to allocate to elem field greater than defined for this problem',ne_field,num_ne
+    elseif(elem_number.gt.num_elems)then
+      print *, 'WARNING: trying to allocate to element greater than defined for this problem',elem_number,num_elems
+    else
+      elem_field(ne_field,elem_number) = value
+    endif
+    call enter_exit(sub_name,2)
+  end subroutine update_1d_elem_field
+ !
+ !##############################################################
+ !
+
   subroutine get_final_real(string,rtemp)
     use arrays,only: dp
     implicit none

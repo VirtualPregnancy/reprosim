@@ -16,6 +16,7 @@ void define_rad_from_geom_c(const char *order_system, int *order_system_len, dou
                             const char *group_type, int *group_type_len, const char *group_options, int *group_options_len);
 void element_connectivity_1d_c();
 void evaluate_ordering_c();
+void update_1d_elem_field_c(int *ne_field, int *elem_number, double *value);
 
 
 void add_matching_mesh(const char *umbilical_elem_option, int umbilical_element_numbers_len, int umbilical_element_numbers[])
@@ -78,4 +79,9 @@ void element_connectivity_1d()
 void evaluate_ordering()
 {
   evaluate_ordering_c();
+}
+
+void update_1d_elem_field(int ne_field, int elem_number, double value)
+{
+  update_1d_elem_field_c(&ne_field, &elem_number, &value);
 }

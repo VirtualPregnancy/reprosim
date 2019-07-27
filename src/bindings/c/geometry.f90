@@ -224,6 +224,21 @@ contains
 !
 !###################################################################################
 !
+subroutine update_1d_elem_field_c(ne_field, elem_number,value) &
+   bind(C, name="update_1d_elem_field_c")
+    use geometry, only: update_1d_elem_field
+    use arrays, only: dp
+    implicit none
+    integer, intent(in) :: ne_field
+    integer, intent(in) :: elem_number
+    real(dp), intent(in) :: value
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_update_1d_elem_field(ne_field,elem_number,value)
+#else
+    call update_1d_elem_field(ne_field,elem_number,value)
+#endif
+end subroutine update_1d_elem_field_c
 
 end module geometry_c
 
