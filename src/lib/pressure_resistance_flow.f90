@@ -817,10 +817,10 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
  	enddo
  	NonZeros = NonZeros - fixed_flows
  	
- 	!if(diagnostics_level.GT.1)then
+ 	if(diagnostics_level.GT.1)then
  		print *,"MatrixSize",MatrixSize
  		print *,"NonZeros",NonZeros
- 	!endif
+ 	endif
  
 end subroutine calc_sparse_size
 
@@ -1122,10 +1122,9 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
 	  	endif
 	  endif
 	enddo !ne
-	!if(diagnostics_level.GT.1)then
+	if(diagnostics_level.GT.1)then
     		print *,"MatrixSize 2=",MatrixSize,num_elems,num_nodes,nzz,nzz_row
     		print *,"NonZeros 2=",NonZeros
-    	if(diagnostics_level.GT.1)then
     		do nzz=1,NonZeros
   			print *,"SparseCol(",nzz,")",SparseCol(nzz)
   		enddo
