@@ -218,7 +218,6 @@ contains
        !arteries = number of elems + 1; 4 umbilical vein nodes
        ! the number of elems after adding mesh will be:
        num_elems_new = 2*num_elems + num_units - (umb_elems_count - 3) !there are 3 umbilical venous elements
-                                                 
     endif
 
     allocate(np_map(num_nodes))
@@ -1544,6 +1543,8 @@ contains
                  STRAHLER_ADD=0
                  STRAHLER=elem_ordrs(3,ne2) !highest daughter
                ENDIF
+             else
+               STRAHLER_ADD = 0
              endif !not anast (ne2)
            ENDDO !noelem2 (ne2)
            n_horsfield=n_horsfield+1 !Horsfield ordering

@@ -56,6 +56,30 @@ contains
 
   end subroutine export_1d_elem_geometry_c
 
+!!!############################################################################
+
+  subroutine exportip_1d_elem_geometry_c(IPELEMFILE, filename_len) bind(C, name="exportip_1d_elem_geometry_c")
+
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use exports, only: exportip_1d_elem_geometry
+    use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
+    implicit none
+    integer,intent(in) :: filename_len
+    type(c_ptr), value, intent(in) :: IPELEMFILE
+    character(len=MAX_FILENAME_LEN) :: filename_f
+
+    call strncpy(filename_f, IPELEMFILE, filename_len)
+
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_exportip_1d_elem_geometry(filename_f)
+#else
+    call exportip_1d_elem_geometry(filename_f)
+#endif
+
+  end subroutine exportip_1d_elem_geometry_c
+
 
 !!!##########################################################################
 
@@ -82,6 +106,31 @@ contains
 #endif
 
   end subroutine export_node_geometry_c
+
+
+!!!##########################################################################
+
+  subroutine exportip_node_geometry_c(IPNODEFILE, filename_len) bind(C, name="exportip_node_geometry_c")
+
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
+    use exports, only: exportip_node_geometry
+    implicit none
+
+    integer,intent(in) :: filename_len
+    type(c_ptr), value, intent(in) :: IPNODEFILE
+    character(len=MAX_FILENAME_LEN) :: filename_f
+
+    call strncpy(filename_f, IPNODEFILE, filename_len)
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_exportip_node_geometry(filename_f)
+#else
+    call exportip_node_geometry(filename_f)
+#endif
+
+  end subroutine exportip_node_geometry_c
 
   !!!########################################################################
 

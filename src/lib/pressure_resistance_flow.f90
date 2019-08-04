@@ -203,8 +203,6 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
     !NEED TO UPDATE TERMINAL SOLUTION HERE. LOOP THO' UNITS AND TAKE FLOW AND PRESSURE AT TERMINALS
     call map_flow_to_terminals
 
-
-
     deallocate (mesh_from_depvar, STAT = AllocateStatus)
     deallocate (depvar_at_elem, STAT = AllocateStatus)
     deallocate (depvar_at_node, STAT = AllocateStatus)
@@ -807,9 +805,10 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
  	enddo
  	
  	fixed_pressures = fixed_variables - fixed_flows
-
  	!count of pressure equations = (number of elements * 3 variables in each equation) - fixed pressures - fixed flows
- 	NonZeros = num_elems*3 - fixed_pressures - fixed_flows
+ 	!NonZeros = num_elems*3 - fixed_pressures - fixed_flows + 3
+ 	NonZeros = (num_elems-fixed_pressures-fixed_flows)*3 + (fixed_pressures + fixed_flows)*2
+
  	!count of conservation of flow equations = sum of elements connected to nodes which have at least 2 connected elements - fixed flows
  	do np=1, num_nodes
  		if(elems_at_node(np,0).GT.1)then
@@ -818,10 +817,10 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
  	enddo
  	NonZeros = NonZeros - fixed_flows
  	
- 	if(diagnostics_level.GT.1)then
+ 	!if(diagnostics_level.GT.1)then
  		print *,"MatrixSize",MatrixSize
  		print *,"NonZeros",NonZeros
- 	endif
+ 	!endif
  
 end subroutine calc_sparse_size
 
@@ -1049,7 +1048,6 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
    	  		endif
  	  	endif
   	  enddo !nn
-
   	  !look at flow variable for the element
 	  flow_var = depvar_at_elem(0,1,ne)
 	  if(.NOT.FIX(flow_var))then !don't do anything if flow is fixed
@@ -1096,13 +1094,11 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
 	  		depvar1=depvar_at_node(np1,1,1) !pressure variable for first node
 	  		np2=elem_nodes(2,ne) !second node
       		depvar2=depvar_at_node(np2,1,1) !pressure variable for second node
-
 			!unknown variable -pressure for node 1
 			call get_variable_offset(depvar1,mesh_dof,FIX,offset)
 			SparseCol(nzz) = depvar1 - offset !variable number
 			SparseVal(nzz)=1.0_dp !variable coefficient
 			nzz=nzz+1 !next column
-
 			if(FIX(depvar2))then !checking if pressure at 2nd node is fixed
 	       		!store known variable - outlet pressure
 				RHS(nzz_row) = prq_solution(depvar2)
@@ -1126,9 +1122,10 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
 	  	endif
 	  endif
 	enddo !ne
-	if(diagnostics_level.GT.1)then
-    		print *,"MatrixSize=",MatrixSize
-    		print *,"NonZeros=",NonZeros
+	!if(diagnostics_level.GT.1)then
+    		print *,"MatrixSize 2=",MatrixSize,num_elems,num_nodes,nzz,nzz_row
+    		print *,"NonZeros 2=",NonZeros
+    	if(diagnostics_level.GT.1)then
     		do nzz=1,NonZeros
   			print *,"SparseCol(",nzz,")",SparseCol(nzz)
   		enddo

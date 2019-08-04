@@ -5,7 +5,9 @@ module exports
   implicit none
 
   private
-  public export_1d_elem_geometry,export_node_geometry,export_node_field,&
+  public export_1d_elem_geometry,exportip_1d_elem_geometry,&
+       export_node_geometry,exportip_node_geometry,&
+       export_node_field,&
        export_terminal_perfusion,&
        export_1d_elem_field
 
@@ -119,6 +121,46 @@ contains
 
   end subroutine export_1d_elem_geometry
 
+!!############################################################################
+
+  subroutine exportip_1d_elem_geometry(IPELEMFILE)
+
+    use arrays,only: elem_nodes,num_elems
+    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORTIP_1D_ELEM_GEOMETRY" :: EXPORTIP_1D_ELEM_GEOMETRY
+
+!!! Parameters
+    character(len=MAX_FILENAME_LEN), intent(in) :: IPELEMFILE
+
+!!! Local Variables
+    integer :: len_end,ne,nj,nn
+    character(len=1) :: char1
+    logical :: CHANGED
+    character(len=MAX_STRING_LEN) :: name
+
+    open(10, file=IPELEMFILE, status='replace')
+    len_end=len_trim(name)
+    !**     write the group name
+    write(10,'( ''CMISS Version 2.1  ipelem File Version 2'')')
+    !**         write the elements
+    write(10,'( ''Heading:'' )')
+    write(10,'( '''')')
+    write(10,'(''The number of elements is [     '',I6,'']:      '',I6,'''')') num_elems,num_elems
+    CHANGED=.TRUE. !initialise to force output of element information
+    do ne=1,num_elems
+       write(10,'( '''')')
+       write(10,'( ''Element number['',I6,'']: '',I6,'''')') ne,ne
+       write(10,'( ''The number of geometric Xj-coordinates is [3]: 3'' )')
+       write(10,'( ''The basis function type for geometric variable 1 is [1]:  1'')')
+       write(10,'( ''The basis function type for geometric variable 2 is [1]:  1'')')
+       write(10,'( ''The basis function type for geometric variable 3 is [1]:  1'')')
+       write(10,'( ''Enter the 2 global numbers for basis 1:   '',I6,''   '',I6,'''')') elem_nodes(1,ne),elem_nodes(2,ne)
+    enddo !no_nelist (ne)
+    close(10)
+
+  end subroutine exportip_1d_elem_geometry
+
 
 !!!##########################################################################
 
@@ -172,6 +214,58 @@ contains
     close(10)
 
   end subroutine export_node_geometry
+!###############################################################
+  subroutine exportip_node_geometry(IPNODEFILE)
+
+    use arrays,only: node_xyz,num_nodes
+    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORTIP_NODE_GEOMETRY" :: EXPORTIP_NODE_GEOMETRY
+
+!!! Parameters
+    character(len=MAX_FILENAME_LEN),intent(in) :: IPNODEFILE
+
+
+!!! Local Variables
+    integer :: len_end,nj,np,np_last,VALUE_INDEX
+    logical :: FIRST_NODE
+    character(len=MAX_STRING_LEN) :: name
+
+    len_end=len_trim(name)
+!    if(num_nodes.GT.0) THEN
+!       open(10, file=IPNODEFILE, status='replace')
+!       !**     write the group name
+!       write(10,'( '' Group name: '',A)') name(:len_end)
+!       FIRST_NODE=.TRUE.
+!       np_last=1
+!       !*** Exporting Geometry
+!       do np=1,num_nodes
+!          if(np.gt.1) np_last = np
+!          !*** Write the field information
+!          VALUE_INDEX=1
+!          if(FIRST_NODE)THEN
+!             write(10,'( '' #Fields=1'' )')
+!            write(10,'('' 1) coordinates, coordinate, rectangular cartesian, #Components=3'')')
+!             do nj=1,3
+!                if(nj.eq.1) write(10,'(2X,''x.  '')',advance="no")
+!                if(nj.eq.2) write(10,'(2X,''y.  '')',advance="no")
+!                if(nj.eq.3) write(10,'(2X,''z.  '')',advance="no")
+!                write(10,'(''Value index='',I1,'', #Derivatives='',I1)',advance="no") 1,0
+!                write(10,'()')
+!             enddo
+!          endif !FIRST_NODE
+!          !***      write the node
+!          write(10,'(1X,''Node: '',I12)') np
+!          do nj=1,3
+!             write(10,'(2X,4(1X,F12.6))') (node_xyz(nj,np))
+!          enddo !njj2
+!          FIRST_NODE=.FALSE.
+!          np_last=np
+!       enddo !nolist (np)
+!    endif !num_nodes
+!    close(10)
+
+  end subroutine exportip_node_geometry
 
 !!!########################################################################
 

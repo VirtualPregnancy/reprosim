@@ -7,10 +7,12 @@
 void export_1d_elem_field_c(int *ne_field, const char *EXELEMFILE, int *EXELEMFILE_LEN,
                             const char *group_name, int *group_name_len, const char *field_name, int *field_name_len );
 void export_1d_elem_geometry_c(const char *EXELEMFILE, int *EXELEMFILE_LEN, const char *name, int *name_len);
+void exportip_1d_elem_geometry_c(const char *IPELEMFILE, int *IPELEMFILE_LEN);
 void export_node_field_c(int *nj_field, const char *EXNODEFIELD, int *EXNODEFIELD_LEN,
                          const char *name, int *name_len, const char *field_name, int *field_name_len);
 void export_terminal_perfusion_c(const char *EXNODEFILE, int *EXNODEFILE_LEN, const char *name, int *name_len);
 void export_node_geometry_c(const char *EXNODEFILE, int *EXNODEFILE_LEN, const char *name, int *name_len);
+void exportip_node_geometry_c(const char *IPNODEFILE, int *IPNODEFILE_LEN);
 
 void export_1d_elem_field(int ne_field, const char *EXELEMFILE, const char *group_name, const char *field_name )
 {
@@ -27,6 +29,13 @@ void export_1d_elem_geometry(const char *EXELEMFILE, const char *name)
   int name_len = strlen(name);
 
   export_1d_elem_geometry_c(EXELEMFILE, &filename_len, name, &name_len);
+}
+
+void exportip_1d_elem_geometry(const char *IPELEMFILE)
+{
+  int filename_len = strlen(IPELEMFILE);
+
+  exportip_1d_elem_geometry_c(IPELEMFILE, &filename_len);
 }
 
 void export_node_field(int nj_field, const char *EXNODEFIELD, const char *name, const char *field_name)
@@ -53,3 +62,11 @@ void export_node_geometry(const char *EXNODEFILE, const char *name)
 
   export_node_geometry_c(EXNODEFILE, &filename_len, name, &name_len);
 }
+
+void exportip_node_geometry(const char *IPNODEFILE)
+{
+  int filename_len = strlen(IPNODEFILE);
+
+  exportip_node_geometry_c(IPNODEFILE, &filename_len);
+}
+
