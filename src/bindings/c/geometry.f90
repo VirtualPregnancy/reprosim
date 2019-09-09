@@ -67,7 +67,8 @@ contains
 !
 !###################################################################################
 !
-  subroutine define_1d_elements_c(ELEMFILE, filename_len) bind(C, name="define_1d_elements_c")
+  subroutine define_1d_elements_c(ELEMFILE, filename_len, anastomosis_elem_in) &
+              bind(C, name="define_1d_elements_c")
 
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
@@ -76,15 +77,16 @@ contains
     implicit none
 
     integer,intent(in) :: filename_len
+    integer,intent(in) :: anastomosis_elem_in
     type(c_ptr), value, intent(in) :: ELEMFILE
     character(len=MAX_FILENAME_LEN) :: filename_f
 
     call strncpy(filename_f, ELEMFILE, filename_len)
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_define_1d_elements(filename_f)
+    call so_define_1d_elements(filename_f,anastomosis_elem_in)
 #else
-    call define_1d_elements(filename_f)
+    call define_1d_elements(filename_f,anastomosis_elem_in)
 #endif
 
   end subroutine define_1d_elements_c

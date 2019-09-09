@@ -55,9 +55,9 @@ contains
     integer :: num_nodes_new,num_elems_new,ne,ne_global,np,np_global,np0,nonode,np_m, &
             downstream_elem, node_counter, elem_counter, indx, elem_at_node, indx2, &
             nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter, &
-            max_ne, max_elem_indx,umb_node_counter,node_no,no_umb_art_nodes, umb_elem,&
+            max_ne, max_elem_indx,umb_node_counter,node_no, umb_elem,&
             inlet_counter,outlet_counter,j,umb_elems_count,umb_elem_indx,ierror,ntemp,dwn_elems, &
-            inlet1_np1,inlet2_np1 
+            inlet1_np1,inlet2_np1,num_umb_nodes 
     integer, allocatable :: np_map(:)
     integer, allocatable :: ne_map(:)
     integer :: umb_inlets(2) = 0
@@ -176,13 +176,13 @@ contains
           print *,"umbilical outlets not found"
 	  call exit(1)
        endif
-
+       
        ! the number of nodes after adding mesh will be:
-       num_nodes_new = 2*num_nodes - (umb_elems_count + 1 - 4) !number of nodes in umbilical 
+       num_nodes_new = 2*num_nodes - (umb_node_counter - 4) !umb_elems_count + 1 = number of nodes in umbilical section 
        !arteries = number of elems + 1; 4 umbilical vein nodes
        ! the number of elems after adding mesh will be:
        num_elems_new = 2*num_elems + num_units - (umb_elems_count - 3) !there are 3 umbilical venous elements
-                                                 
+                                         
     endif
 
     allocate(np_map(num_nodes))
@@ -332,7 +332,7 @@ contains
           elems_at_node(elem_nodes(2,noelem),elems_at_node(elem_nodes(2,noelem),0))=noelem
         enddo
     endif
-          
+         
     do noelem=1,num_elems
         ne_m=elems(noelem)
         elem_field(ne_group,ne_m)=0.0_dp!ARTERY
@@ -756,17 +756,18 @@ contains
 !
 !###################################################################################
 !
-  subroutine define_1d_elements(ELEMFILE)
+  subroutine define_1d_elements(ELEMFILE,anastomosis_elem_in)
   !*Description:* Reads in an element ipelem file to define a geometry
     use arrays,only: dp, elem_direction,elem_field,elems,elem_cnct,elem_nodes,&
          elem_ordrs,elem_symmetry,elems_at_node,elem_units_below,&
-         node_xyz,num_elems,num_nodes
+         node_xyz,num_elems,num_nodes,elem_cnct_no_anast,anastomosis_elem
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_1D_ELEMENTS" :: DEFINE_1D_ELEMENTS
 
     character(len=MAX_FILENAME_LEN), intent(in) :: ELEMFILE
+    integer, optional :: anastomosis_elem_in
     !     Local Variables
     integer :: ibeg,iend,ierror,i_ss_end,j,ne,ne_global,&
          nn,np,np1,np2,np_global
@@ -778,6 +779,8 @@ contains
     sub_name = 'define_1d_elements'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
+
+    anastomosis_elem = anastomosis_elem_in
 
     open(10, file=ELEMFILE, status='old')
 
@@ -797,6 +800,8 @@ contains
     allocate(elems(num_elems))
     if(allocated(elem_cnct)) deallocate(elem_cnct)
     allocate(elem_cnct(-1:1,0:2,0:num_elems))
+    if(allocated(elem_cnct_no_anast)) deallocate(elem_cnct_no_anast)
+    allocate(elem_cnct_no_anast(-1:1,0:2,0:num_elems))
     if(allocated(elem_nodes)) deallocate(elem_nodes)
     allocate(elem_nodes(2,num_elems))
     if(allocated(elem_ordrs)) deallocate(elem_ordrs)
@@ -1176,7 +1181,7 @@ contains
 
   subroutine define_rad_from_geom(ORDER_SYSTEM, CONTROL_PARAM, START_FROM, START_RAD, group_type_in, group_option_in)
   !*Description:* Defines vessel radius based on their geometric structure
-    use arrays,only: dp,num_elems,elem_field,elem_ordrs,maxgen,elem_cnct,num_arterial_elems
+    use arrays,only: dp,num_elems,elem_field,elem_ordrs,maxgen,elem_cnct,num_arterial_elems,anastomosis_elem
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
@@ -1263,8 +1268,12 @@ contains
     endif
 
     do ne=ne_min,ne_max
-     radius=10.0_dp**(log10(CONTROL_PARAM)*dble(elem_ordrs(nindex,ne)-n_max_ord)&
+     if(ne.NE.anastomosis_elem)then
+        radius=10.0_dp**(log10(CONTROL_PARAM)*dble(elem_ordrs(nindex,ne)-n_max_ord)&
         +log10(START_RAD))
+     else
+        radius=1.0_dp !Monika - temp
+     endif
      elem_field(ne_radius,ne)=radius  
      elem_field(ne_radius_in,ne)=radius
      elem_field(ne_radius_out,ne)=radius
@@ -1291,13 +1300,14 @@ contains
 !
   subroutine element_connectivity_1d()
   !*Description:* Calculates element connectivity in 1D and stores in elelem_cnct
-    use arrays,only: elem_cnct,elem_nodes,elems_at_node,num_elems,num_nodes
+    use arrays,only: elem_cnct,elem_nodes,elems_at_node,num_elems,num_nodes,elem_cnct_no_anast,&
+                     anastomosis_elem
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ELEMENT_CONNECTIVITY_1D" :: ELEMENT_CONNECTIVITY_1D
   
     !     Local Variables
-    integer :: ne,ne2,nn,noelem,np,np2,np1,counter,orphan_counter
+    integer :: ne,ne2,nn,noelem,np,np2,np1,counter,orphan_counter,np2_1
     integer,parameter :: NNT=2
     character(len=60) :: sub_name
     integer :: orphan_nodes(num_nodes)
@@ -1306,8 +1316,6 @@ contains
     sub_name = 'element_connectivity_1d'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
-
-    elem_cnct = 0 !initialise
 
     ! calculate elems_at_node array: stores the elements that nodes are in
     ! elems_at_node(node np,0)= total number of elements connected to this node
@@ -1352,6 +1360,7 @@ contains
     ! calculate elem_cnct array: stores the connectivity of all elements
     
     elem_cnct=0 !initialise all elem_cnct
+    elem_cnct_no_anast = 0 !initialise
 
     DO ne=1,num_elems
        !     ne_global=elems(noelem)
@@ -1362,10 +1371,20 @@ contains
           DO noelem=1,elems_at_node(np2,0) !for each element connected to node np2
              ne2=elems_at_node(np2,noelem) !get the element number connected to node np2
              IF(ne2 /= ne)THEN !if element connected to node np2 is not the current element ne
-                elem_cnct(-1,0,ne2)=elem_cnct(-1,0,ne2)+1
-                elem_cnct(-1,elem_cnct(-1,0,ne2),ne2)=ne !previous element              
-                elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1
-                elem_cnct(1,elem_cnct(1,0,ne),ne)=ne2
+                !check that the second node of the current element is the first node of ne2
+                np2_1 = elem_nodes(1,ne2)
+                if(np2.EQ.np2_1)then
+                   elem_cnct(-1,0,ne2)=elem_cnct(-1,0,ne2)+1
+                   elem_cnct(-1,elem_cnct(-1,0,ne2),ne2)=ne !previous element              
+                   elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1
+                   elem_cnct(1,elem_cnct(1,0,ne),ne)=ne2
+                   if((ne2.NE.anastomosis_elem).AND.(ne.NE.anastomosis_elem))then
+                      elem_cnct_no_anast(-1,0,ne2)=elem_cnct_no_anast(-1,0,ne2)+1
+                      elem_cnct_no_anast(-1,elem_cnct_no_anast(-1,0,ne2),ne2)=ne !previous element              
+                      elem_cnct_no_anast(1,0,ne)=elem_cnct_no_anast(1,0,ne)+1
+                      elem_cnct_no_anast(1,elem_cnct_no_anast(1,0,ne),ne)=ne2
+                   endif
+                endif
              ENDIF !ne2
           ENDDO !noelem2
 
@@ -1406,7 +1425,7 @@ contains
   subroutine evaluate_ordering()
   !*Description:* calculates generations, Horsfield orders, Strahler orders for a given tree
    
-    use arrays,only: elem_cnct,elem_nodes,elem_ordrs,elem_symmetry,&
+    use arrays,only: elem_cnct_no_anast,elem_nodes,elem_ordrs,elem_symmetry,&
          elems_at_node,num_elems,num_nodes,maxgen
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
@@ -1429,12 +1448,12 @@ contains
     elem_ordrs = 0
     maxgen=1
     DO ne=1,num_elems
-       ne0=elem_cnct(-1,1,ne) !parent
+       ne0=elem_cnct_no_anast(-1,1,ne) !parent
        IF(ne0.NE.0)THEN
           n_generation=elem_ordrs(1,ne0) !parent generation
-          IF(elem_cnct(1,0,ne0).EQ.1)THEN !single daughter
+          IF(elem_cnct_no_anast(1,0,ne0).EQ.1)THEN !single daughter
              elem_ordrs(1,ne)=n_generation + (elem_symmetry(ne)-1)
-          ELSE IF(elem_cnct(1,0,ne0).GE.2)THEN
+          ELSE IF(elem_cnct_no_anast(1,0,ne0).GE.2)THEN
              elem_ordrs(1,ne)=n_generation+1
           ENDIF
        ELSE
@@ -1450,16 +1469,16 @@ contains
     !.....Calculate the branch orders
     DO ne=num_elems,1,-1
        n_horsfield=MAX(elem_ordrs(2,ne),1)
-       n_children=elem_cnct(1,0,ne) !number of child branches
+       n_children=elem_cnct_no_anast(1,0,ne) !number of child branches
        IF(n_children.EQ.1)THEN
-          IF(elem_ordrs(1,elem_cnct(1,1,ne)).EQ.0)  n_children=0
+          IF(elem_ordrs(1,elem_cnct_no_anast(1,1,ne)).EQ.0)  n_children=0
        ENDIF
        STRAHLER=0
        STRAHLER_ADD=1
        IF(n_children.GE.2)THEN !branch has two or more daughters
-          STRAHLER=elem_ordrs(3,elem_cnct(1,1,ne)) !first daughter
+          STRAHLER=elem_ordrs(3,elem_cnct_no_anast(1,1,ne)) !first daughter
           DO noelem2=1,n_children !for all daughters
-             ne2=elem_cnct(1,noelem2,ne) !global element # of daughter
+             ne2=elem_cnct_no_anast(1,noelem2,ne) !global element # of daughter
              temp1=elem_ordrs(2,ne2) !Horsfield order of daughter
              IF(temp1.GT.n_horsfield) n_horsfield=temp1
              IF(elem_ordrs(3,ne2).LT.STRAHLER)THEN
@@ -1471,10 +1490,10 @@ contains
           ENDDO !noelem2 (ne2)
           n_horsfield=n_horsfield+1 !Horsfield ordering
        ELSE IF(n_children.EQ.1)THEN
-          ne2=elem_cnct(1,1,ne) !local element # of daughter
+          ne2=elem_cnct_no_anast(1,1,ne) !local element # of daughter
           n_horsfield=elem_ordrs(2,ne2)+(elem_symmetry(ne)-1)
           STRAHLER_ADD=elem_ordrs(3,ne2)+(elem_symmetry(ne)-1)
-       ENDIF !elem_cnct
+       ENDIF !elem_cnct_no_anast
        elem_ordrs(2,ne)=n_horsfield !store the Horsfield order
        elem_ordrs(3,ne)=STRAHLER+STRAHLER_ADD !Strahler order
     ENDDO !noelem
@@ -1498,8 +1517,8 @@ contains
           DISCONNECT=.TRUE.
        ELSEIF(num_attach.EQ.1)THEN
           ne=elems_at_node(np,1)
-          IF(elem_cnct(1,0,ne).EQ.0) OUTLETS=OUTLETS+1
-         IF(elem_cnct(-1,0,ne).EQ.0) INLETS=INLETS+1
+          IF(elem_cnct_no_anast(1,0,ne).EQ.0) OUTLETS=OUTLETS+1
+         IF(elem_cnct_no_anast(-1,0,ne).EQ.0) INLETS=INLETS+1
        ELSEIF(num_attach.GT.3)THEN
           WRITE(*,*) ' Node ',np,' attached to',num_attach,' elements'
        ENDIF

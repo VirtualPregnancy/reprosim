@@ -5,13 +5,14 @@ module arrays
   implicit none
 
   integer :: num_elems,num_nodes,num_units,maxgen,num_arterial_elems, &
-             num_conv,num_conv_gen
+             num_conv,num_conv_gen,anastomosis_elem
   
   integer, parameter :: dp=kind(0.d0) !  for double precision
 
   integer,allocatable :: nodes(:) !allocated in define_node_geometry
   integer,allocatable :: elems(:) !allocated in define_1d_elements
   integer,allocatable :: elem_cnct(:,:,:)  !NXI(-ni:ni,1,ne)
+  integer,allocatable :: elem_cnct_no_anast(:,:,:)  !NXI(-ni:ni,1,ne) !copy of elem_cnct array without the anastomosis element
   integer,allocatable :: elem_nodes(:,:)
   integer,allocatable :: elem_ordrs(:,:)
   integer,allocatable :: elem_symmetry(:)
@@ -36,7 +37,7 @@ module arrays
     num_nodes, units, num_units, unit_field, node_field, dp, elem_cnct, elem_ordrs, elem_direction, &
     elems_at_node, elem_symmetry, elem_units_below, maxgen, num_arterial_elems, &
     num_conv,num_conv_gen,cap_resistance,terminal_resistance,terminal_length, &
-    total_vasc_resistance,cap_radius
+    total_vasc_resistance,cap_radius,elem_cnct_no_anast,anastomosis_elem
 
 contains
   subroutine set_node_field_value(row, col, value)  

@@ -340,18 +340,19 @@ subroutine calculate_stats()
                   num_conv,num_conv_gen,cap_resistance,terminal_resistance, &
                   terminal_length,total_vasc_resistance, &
                   cap_radius
-    use other_consts, only: PI
+    use other_consts, only: PI,MAX_FILENAME_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
   
   !local variables
+    character(len=MAX_FILENAME_LEN) :: FLOW_GEN_FILE
     integer :: ne,nu,nc,order,max_strahler,no_branches, &
                ne_order,branch,ven_elems,max_gen
     real(dp) :: arterial_vasc_volume, total_vasc_volume, capillary_volume, &
                 venous_vasc_volume, single_cap_surface_area, total_cap_surface_area, &
                 mean_diameter,std_diameter,total_resistance,std_terminal_flow, &
                 cof_var_terminal_flow,mean_terminal_flow,small_vessel_volume, diameter, &
-                image_voxel_size,single_capillary_volume, cap_length
+                image_voxel_size,single_capillary_volume, cap_length,cof_var_cap_flow
     integer :: strahler_orders(num_elems)
     integer :: generations(num_elems)
     integer :: capillaries(num_units)
@@ -525,7 +526,8 @@ subroutine calculate_stats()
 
    endif !(ven_elems.GT.0)
   
-   !coefficient of variation for terminal flow
+
+  !coefficient of variation for terminal flow
    !standard deviation of flow devided by the mean flow
    mean_terminal_flow = 0
    do nu=1,num_units
@@ -543,6 +545,7 @@ subroutine calculate_stats()
    cof_var_terminal_flow = std_terminal_flow/mean_terminal_flow
    print *, "Coefficient of variation for terminal flow (%) = ", cof_var_terminal_flow * 100
 
+
   
    !terminal flow by generation
    generations(:) = elem_ordrs(no_gen, :)
@@ -551,6 +554,11 @@ subroutine calculate_stats()
    allocate(gen_branch_count(max_gen))
    terminal_flow_by_gen = 0
    gen_branch_count = 0
+
+  !print all terminal flows and their corresponding generations to a file 
+   FLOW_GEN_FILE = "Output/terminal flow per generation.csv"
+   open(10, file=FLOW_GEN_FILE, status="replace")
+   write(10,*) 'terminal_blood_flow,generation'
    do nu=1,num_units
       ne = units(nu)  
       ne_order = generations(ne)
@@ -558,7 +566,9 @@ subroutine calculate_stats()
       no_branches = no_branches + 1
       terminal_flow_by_gen(ne_order,no_branches) = elem_field(ne_Qdot,ne)
       gen_branch_count(ne_order) = no_branches
+      write(10,*) elem_field(ne_Qdot,ne),',',ne_order
    enddo
+   close(10)
    print *, "Terminal flow (mm**3/s) by generation:"
    print *, "Generation,number_of_terminal_units,mean_flow,min_flow,max_flow,std"
    do order=1, max_gen
@@ -578,6 +588,7 @@ subroutine calculate_stats()
       endif 
    
    enddo 
+
 
    call enter_exit(sub_name,2)
 
@@ -707,10 +718,10 @@ subroutine tree_resistance(resistance)
       invres=0.0_dp
       do num2=1,elem_cnct(1,0,ne)
          ne2=elem_cnct(1,num2,ne)
-         invres=invres+1.0_dp/elem_res(ne2)
+         invres=invres+1.0_dp/elem_res(ne2) !resistance in parallel, for daughter branches
       enddo
       if(elem_cnct(1,0,ne).gt.0)then 
-        elem_res(ne)=elem_res(ne)+1.0_dp/invres
+        elem_res(ne)=elem_res(ne)+1.0_dp/invres !resistance in a series
        endif
     enddo
     resistance=elem_res(1)
@@ -1052,24 +1063,24 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
           	if((bc_type.EQ.'pressure').OR.((bc_type.EQ.'flow').AND.(.NOT.one_node_balanced)))then !do just one flow balance equation for bc_type flow          		
           		!go through each element connected to node np and add the conservation of flow equation for the elements
           		do noelem2=1,elems_at_node(np,0)            
-              		ne2=elems_at_node(np,noelem2)
-              		depvar=depvar_at_elem(1,1,ne2)              
-              		flow_term = 0
-              		if(np.EQ.elem_nodes(2,ne2))then !end node
+              		    ne2=elems_at_node(np,noelem2)
+              		    depvar=depvar_at_elem(1,1,ne2)              
+              		    flow_term = 0
+              		    if(np.EQ.elem_nodes(2,ne2))then !end node
               			flow_term = 1.0_dp              
-              		elseif(np.EQ.elem_nodes(1,ne2))then !start node
+              		    elseif(np.EQ.elem_nodes(1,ne2))then !start node
               			flow_term = -1.0_dp   
-              		endif           
-              		if(FIX(depvar))then           
+              		    endif           
+              		    if(FIX(depvar))then           
               			RHS(nzz_row)=-prq_solution(depvar)*flow_term
-              		else
+              		    else
                 		!populate SparseCol and SparseVal
-			  			call get_variable_offset(depvar,mesh_dof,FIX,offset)			
-			  			SparseCol(nzz) = depvar - offset
+			  	call get_variable_offset(depvar,mesh_dof,FIX,offset)			
+			  	SparseCol(nzz) = depvar - offset
               			SparseVal(nzz) = flow_term 
               			nzz = nzz + 1             	                          
-              		endif            
-				enddo  			
+              		    endif            
+			enddo  			
 				FlowBalancedNodes(np) = .TRUE.
 				nzz_row=nzz_row+1 !store next row position
 	    			SparseRow(nzz_row)=nzz	
