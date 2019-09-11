@@ -19,6 +19,7 @@ module arrays
   integer,allocatable :: elem_units_below(:)
   integer,allocatable :: elems_at_node(:,:)
   integer,allocatable :: units(:)
+  integer,allocatable :: is_capillary_unit(:)
 
   real(dp),allocatable :: elem_field(:,:) !properties of elements
   real(dp),allocatable :: elem_direction(:,:)
@@ -27,7 +28,7 @@ module arrays
   real(dp),allocatable :: node_field(:,:)
 
   real(dp) :: cap_resistance,terminal_resistance,terminal_length, &
-              total_vasc_resistance,cap_radius
+              total_vasc_resistance,cap_radius,total_cap_volume,total_cap_surface_area
 
 ! temporary, for debugging:
   real(dp) :: unit_before
@@ -37,7 +38,8 @@ module arrays
     num_nodes, units, num_units, unit_field, node_field, dp, elem_cnct, elem_ordrs, elem_direction, &
     elems_at_node, elem_symmetry, elem_units_below, maxgen, num_arterial_elems, &
     num_conv,num_conv_gen,cap_resistance,terminal_resistance,terminal_length, &
-    total_vasc_resistance,cap_radius,elem_cnct_no_anast,anastomosis_elem
+    total_vasc_resistance,cap_radius,elem_cnct_no_anast,anastomosis_elem, &
+    is_capillary_unit,total_cap_volume,total_cap_surface_area
 
 contains
   subroutine set_node_field_value(row, col, value)  

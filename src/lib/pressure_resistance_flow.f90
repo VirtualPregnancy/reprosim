@@ -323,7 +323,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
 !
 !##################################################################
 !
-subroutine calculate_stats()
+subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
 !*Descripton:* This subroutine prints the following statistics for the
 ! feto-placental circulation model:
 ! arterial, venous, capillary and total vascular volume
@@ -334,28 +334,34 @@ subroutine calculate_stats()
 ! mean, min, max and standard deviation of venous branch diameter by Strahler order
 ! coefficient of variation for terminal flow
 ! terminal flow by generation
+!
+! Input parameters: FLOW_GEN_FILE - filename to export terminal blood flow statistics
+!                                   by generation
+!                   image_voxel_size in mm - this is used to calculate the volume 
+!                                   of vessels in the reconstructed tree that can't be
+!                                   resolved in the images 
+
     use indices
     use arrays,only: num_arterial_elems,dp,num_elems, &
                   elem_field,num_units,units,elem_cnct,elem_ordrs, &
                   num_conv,num_conv_gen,cap_resistance,terminal_resistance, &
-                  terminal_length,total_vasc_resistance, &
-                  cap_radius
+                  terminal_length,total_vasc_resistance, is_capillary_unit, &
+                  total_cap_volume,total_cap_surface_area
     use other_consts, only: PI,MAX_FILENAME_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
   
+    character(len=MAX_FILENAME_LEN), intent(in) :: FLOW_GEN_FILE
+    real(dp), intent(in) :: image_voxel_size
   !local variables
-    character(len=MAX_FILENAME_LEN) :: FLOW_GEN_FILE
     integer :: ne,nu,nc,order,max_strahler,no_branches, &
                ne_order,branch,ven_elems,max_gen
-    real(dp) :: arterial_vasc_volume, total_vasc_volume, capillary_volume, &
-                venous_vasc_volume, single_cap_surface_area, total_cap_surface_area, &
+    real(dp) :: arterial_vasc_volume, total_vasc_volume, venous_vasc_volume, &
                 mean_diameter,std_diameter,total_resistance,std_terminal_flow, &
                 cof_var_terminal_flow,mean_terminal_flow,small_vessel_volume, diameter, &
-                image_voxel_size,single_capillary_volume, cap_length,cof_var_cap_flow
+                cap_length,cof_var_cap_flow
     integer :: strahler_orders(num_elems)
     integer :: generations(num_elems)
-    integer :: capillaries(num_units)
     real(dp),allocatable :: diameter_by_strahler(:,:)
     real(dp),allocatable :: art_diameter_by_strahler(:,:)
     real(dp),allocatable :: ven_diameter_by_strahler(:,:)
@@ -370,8 +376,6 @@ subroutine calculate_stats()
     call get_diagnostics_level(diagnostics_level)
 
 
-    image_voxel_size = 0.1165 !mm
-
   !calculate arterial vascular volume
    arterial_vasc_volume = 0
    do ne=1,num_arterial_elems
@@ -380,22 +384,9 @@ subroutine calculate_stats()
    print *, "Arterial elems count",num_arterial_elems
    print *, "Arterial vascular volume (cm**3) = ",arterial_vasc_volume/1000
 
-   capillary_volume = 0
-   cap_length=3_dp
-   single_capillary_volume = PI * cap_radius**2 * cap_length 
-   !single capillary volume * number of branching generations * number of terminal units
-   capillary_volume = single_capillary_volume * num_conv_gen * num_units
- 
    print *, "Capillary unit count =",num_units
-   print *, "Capillary volume (cm**3) = ",capillary_volume/1000
-
-   !calculate capillary unit surface area
-
-   !surface area = 2*PI*radius*length
-   single_cap_surface_area = 2 * PI * cap_radius * cap_length
-   !single capillary surface area * number of branching generations * number of terminal units
-   total_cap_surface_area = single_cap_surface_area * num_conv_gen * num_units     
-   print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area/100    
+   print *, "Capillary volume (cm**3) = ",total_cap_volume
+   print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area    
 
    total_vasc_volume = 0
    do ne = 1,num_elems
@@ -403,18 +394,33 @@ subroutine calculate_stats()
    enddo
    print *, "Total vascular volume (cm**3) = ",total_vasc_volume/1000
 
-   venous_vasc_volume = total_vasc_volume - arterial_vasc_volume - capillary_volume  
-   print *, "Venous vascular volume (cm**3) = ",venous_vasc_volume/1000
+   venous_vasc_volume = (total_vasc_volume - arterial_vasc_volume)/1000 
+   venous_vasc_volume = venous_vasc_volume - total_cap_volume 
+   print *, "Venous vascular volume (cm**3) = ",venous_vasc_volume
 
-   !volume of vessels with diameter smaller than 0.1165 mm (resolution of images)
-   small_vessel_volume = 0
-   do ne = 1,num_elems
-      diameter = elem_field(ne_radius,ne) * 2
+   if(image_voxel_size.GT.0)then
+      !volume of vessels with diameter smaller than image voxel size
+      small_vessel_volume = 0
+      do ne = 1,num_elems
+         !skip capillary units
+         if(is_capillary_unit(ne).eq.0)then
+            diameter = elem_field(ne_radius,ne) * 2
+            if(diameter.LT.image_voxel_size)then
+               small_vessel_volume = small_vessel_volume + elem_field(ne_vol,ne)
+            endif
+         endif
+      enddo
+      small_vessel_volume = small_vessel_volume/1000 !convert to cm**3
+      !add all capillary_units
+      ne =units(1) !Get a terminal unit
+      nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+      diameter = elem_field(ne_radius,nc) * 2 !diameter of capillary units
       if(diameter.LT.image_voxel_size)then
-         small_vessel_volume = small_vessel_volume + elem_field(ne_vol,ne)
+         small_vessel_volume = small_vessel_volume + total_cap_volume
       endif
-   enddo
-   print *, "Volume of vessels with diameter smaller than 0.1165 mm (cm**3) = ",small_vessel_volume/1000
+      print *, "Volume of vessels with diameter smaller than ",image_voxel_size, &
+              " mm (cm**3) = ",small_vessel_volume
+   endif
 
    !Print capillary convolute number, generations and total length of capillaries
    print *, "Number of capillary convolutes per generation = ",num_conv
@@ -437,10 +443,12 @@ subroutine calculate_stats()
 
    do ne=1,num_elems
       ne_order = strahler_orders(ne)
-      no_branches = branch_count(ne_order)
-      no_branches = no_branches + 1
-      diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-      branch_count(ne_order) = no_branches
+      if(ne_order.ge.1)then
+         no_branches = branch_count(ne_order)
+         no_branches = no_branches + 1
+         diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+         branch_count(ne_order) = no_branches
+      endif
    enddo
    print *, "Vessel diameter (mm) by Strahler order:"
    print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
@@ -457,17 +465,18 @@ subroutine calculate_stats()
             maxval(diameter_by_strahler(order,:)),",",std_diameter    
    enddo   
 
-
    !Arterial vessel diameter by Strahler order
    allocate(art_diameter_by_strahler(max_strahler,num_arterial_elems))
    art_diameter_by_strahler = 0
    branch_count = 0
    do ne=1,num_arterial_elems
       ne_order = strahler_orders(ne)
-      no_branches = branch_count(ne_order)
-      no_branches = no_branches + 1
-      art_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-      branch_count(ne_order) = no_branches
+      if(ne_order.ge.1)then
+         no_branches = branch_count(ne_order)
+         no_branches = no_branches + 1
+         art_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+         branch_count(ne_order) = no_branches
+      endif
    enddo
    print *, "Arterial vessel diameter (mm) by Strahler order:"
    print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
@@ -486,14 +495,6 @@ subroutine calculate_stats()
 
    !Venous vessel diameter by Strahler order
    
-   !populate capillaries array
-   do nu=1,num_units
-      !get the element below a terminal branch - this is the capillary unit
-      ne =units(nu) !Get a terminal unit   
-      nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
-      capillaries(nu) = nc
-   enddo
-
    !all elements - arterial elements - number of capillaries (the same as number of terminal units)
    ven_elems = num_elems-num_arterial_elems-num_units 
    if (ven_elems.GT.0)then
@@ -501,12 +502,14 @@ subroutine calculate_stats()
       ven_diameter_by_strahler = 0
       branch_count = 0
       do ne=num_arterial_elems+1,num_elems
-         if(ALL(capillaries.NE.ne))then !if the element is not a capillary
+         if(is_capillary_unit(ne).eq.0)then !if the element is not a capillary
             ne_order = strahler_orders(ne)
-            no_branches = branch_count(ne_order)
-            no_branches = no_branches + 1
-            ven_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-            branch_count(ne_order) = no_branches
+	    if(ne_order.ge.1)then
+               no_branches = branch_count(ne_order)
+               no_branches = no_branches + 1
+               ven_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+               branch_count(ne_order) = no_branches
+	    endif
          endif
       enddo
       print *, "Venous vessel diameter (mm) by Strahler order:"
@@ -545,8 +548,6 @@ subroutine calculate_stats()
    cof_var_terminal_flow = std_terminal_flow/mean_terminal_flow
    print *, "Coefficient of variation for terminal flow (%) = ", cof_var_terminal_flow * 100
 
-
-  
    !terminal flow by generation
    generations(:) = elem_ordrs(no_gen, :)
    max_gen = maxval(generations)
@@ -555,8 +556,7 @@ subroutine calculate_stats()
    terminal_flow_by_gen = 0
    gen_branch_count = 0
 
-  !print all terminal flows and their corresponding generations to a file 
-   FLOW_GEN_FILE = "Output/terminal flow per generation.csv"
+   !print all terminal flows and their corresponding generations to a file 
    open(10, file=FLOW_GEN_FILE, status="replace")
    write(10,*) 'terminal_blood_flow,generation'
    do nu=1,num_units

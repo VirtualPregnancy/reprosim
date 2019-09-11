@@ -25,6 +25,8 @@ module geometry
   public update_1d_elem_field
 
 contains
+
+
 !
 !###################################################################################
 !
@@ -56,9 +58,9 @@ contains
     integer :: num_nodes_new,num_elems_new,ne,ne_global,np,np_global,np0,nonode,np_m, &
             downstream_elem, node_counter, elem_counter, indx, elem_at_node, indx2, &
             nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter, &
-            max_ne, max_elem_indx,umb_node_counter,node_no, umb_elem,&
+            max_ne, max_elem_indx,umb_node_counter,node_no,no_umb_art_nodes, umb_elem,&
             inlet_counter,outlet_counter,j,umb_elems_count,umb_elem_indx,ierror,ntemp,dwn_elems, &
-            inlet1_np1,inlet2_np1,num_umb_nodes 
+            inlet1_np1,inlet2_np1,num_umb_nodes  
     integer, allocatable :: np_map(:)
     integer, allocatable :: ne_map(:)
     integer :: umb_inlets(2) = 0
@@ -68,7 +70,7 @@ contains
     integer :: umb_ven_nodes(4) = 0 !umbilical venous nodes
     integer, allocatable :: umb_art_nodes(:)
     integer :: umbilical_elems(20) = 0
-    integer :: index
+    integer :: index, i
     character(LEN=132) :: ctemp1
 
     character(len=60) :: sub_name
@@ -129,7 +131,6 @@ contains
        enddo
 
     elseif(umbilical_elem_option.EQ.'single_umbilical_vein')then
-
        !populate the umbilical arterial nodes array and
        !find the inlet(s) and outlets in the umbilical elements
 
@@ -183,7 +184,7 @@ contains
        !arteries = number of elems + 1; 4 umbilical vein nodes
        ! the number of elems after adding mesh will be:
        num_elems_new = 2*num_elems + num_units - (umb_elems_count - 3) !there are 3 umbilical venous elements
-                                         
+                                              
     endif
 
     allocate(np_map(num_nodes))
@@ -194,9 +195,9 @@ contains
  
     call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
     ne0 = num_elems ! the starting local element number
-    ne_global = elems(ne0) ! assumes this is the highest element number (!!!)
+    ne_global = num_elems ! assumes this is the highest element number (!!!)
     np0 = num_nodes ! the starting local node number
-    np_global = nodes(np0) ! assumes this is the highest node number (!!!)
+    np_global = num_nodes ! assumes this is the highest node number (!!!)
     
     if(umbilical_elem_option.EQ.'single_umbilical_vein')then
 
@@ -257,26 +258,25 @@ contains
        endif
 
        !copy non umbilical arterial nodes
-       do nonode=1,num_nodes
-          if(ALL(umb_art_nodes.NE.nonode))then
+       do np_m=1,num_nodes
+          if(ALL(umb_art_nodes.NE.np_m))then
              np=np_global+node_counter
-             np_m=nodes(nonode)
+             !np_m=nodes(nonode)
              np_map(np_m)=np !maps new to old node numbering
              nodes(np0+node_counter)=np
              do nj=1,3
                node_xyz(nj,np)=node_xyz(nj,np_m)+offset(nj)
              enddo
-             node_counter = node_counter + 1          
+             node_counter = node_counter + 1
           endif
        enddo
-       
     else !umbilical_elem_option = same_as_arterial
 
-       do nonode=1,num_nodes
-          np=np_global+nonode
-          np_m=nodes(nonode)
+       do np_m=1,num_nodes
+          np=np_global+np_m
+          !np_m=nodes(nonode)
           np_map(np_m)=np !maps new to old node numbering
-          nodes(np0+nonode)=np
+          nodes(np0+np_m)=np
           do nj=1,3
             node_xyz(nj,np)=node_xyz(nj,np_m)+offset(nj)
           enddo
@@ -333,12 +333,12 @@ contains
           elems_at_node(elem_nodes(2,noelem),elems_at_node(elem_nodes(2,noelem),0))=noelem
         enddo
     endif
-         
-    do noelem=1,num_elems
-        ne_m=elems(noelem)
+
+    do ne_m=1,num_elems
+        !ne_m=elems(noelem)
         elem_field(ne_group,ne_m)=0.0_dp!ARTERY
         if((umbilical_elem_option.EQ.'same_as_arterial').OR. &
-                    ((umbilical_elem_option.EQ.'single_umbilical_vein').AND.(ALL(umbilical_elems.NE.noelem))))then
+                    ((umbilical_elem_option.EQ.'single_umbilical_vein').AND.(ALL(umbilical_elems.NE.ne_m))))then
            ne=ne_global+elem_counter
            elem_field(ne_group,ne)=2.0_dp!VEIN
            elems(ne0+elem_counter)=ne
@@ -375,8 +375,8 @@ contains
     max_elem_indx = ne0 + elem_counter - 1
 
     !copy element connectivity
-    do noelem=1,num_elems      
-           ne_m=elems(noelem)
+    do ne_m=1,num_elems
+           !ne_m=elems(noelem)
            ne=ne_map(ne_m)
            if(ne.GT.0)then             
               elem_cnct(-1,0,ne)=elem_cnct(1,0,ne_m)
@@ -466,10 +466,9 @@ contains
          elems_at_node(np2,elems_at_node(np2,0))=ne1
          elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1 
          elem_cnct(1,elem_cnct(1,0,ne),ne)=ne1       
-         ne_m=elems(ne)
+         ne_m=ne
          elem_cnct(-1,0,ne_map(ne_m))=elem_cnct(-1,0,ne_map(ne_m))+1
          elem_cnct(-1,elem_cnct(-1,0,ne_map(ne_m)),ne_map(ne_m))=ne1
-         
          elem_cnct(-1,0,ne1)=1
          elem_cnct(1,0,ne1)=1
          elem_cnct(-1,1,ne1)=ne
@@ -566,6 +565,7 @@ contains
     call enter_exit(sub_name,2)
 
   end subroutine add_matching_mesh
+
 !
 !###################################################################################
 !
@@ -646,7 +646,8 @@ contains
     use arrays,only: dp,num_units,units,elem_field,elem_direction, &
                      node_xyz,elem_nodes,elem_cnct,num_conv,num_conv_gen, &
                      cap_resistance,terminal_resistance,terminal_length, &
-                     cap_radius 
+                     cap_radius,is_capillary_unit,total_cap_volume,total_cap_surface_area, &
+                     num_elems
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
     use indices, only: ne_length,ne_radius,ne_vol
@@ -656,7 +657,8 @@ contains
     integer, intent(inout) :: num_convolutes,num_generations
 
     real(dp) :: int_length,int_radius,seg_length,viscosity, &
-                seg_resistance,cap_unit_radius, cap_length
+                seg_resistance,cap_unit_radius, cap_length, &
+                capillary_unit_vol, capillary_unit_area
     real(dp) :: int_radius_in,int_radius_out
     real(dp),allocatable :: resistance(:)
     integer :: ne,nu,i,j,np1,np2,nc,nv
@@ -689,6 +691,11 @@ contains
        STOP "*** Not enough memory for resistance array ***"
     endif
 
+    allocate(is_capillary_unit(num_elems), STAT = AllocateStatus)
+    if (AllocateStatus /= 0)then
+       STOP "*** Not enough memory for is_capillary_unit array ***"
+    endif
+
     ne =units(1) !Get a terminal unit
     nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
     nv =  elem_cnct(1,1,nc) !vein is downstream of the capillary
@@ -702,10 +709,20 @@ contains
     cap_unit_radius = 0.03_dp
     cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
     terminal_resistance = 0
-	
+
+    !calculate total capillary unit volume and surface area so that this can be used by subroutine calculate_stats
+    !in module pressure_resistance_flow
+    capillary_unit_vol = PI * cap_radius**2 * cap_length * num_convolutes * num_generations
+    capillary_unit_area = 2 * PI * cap_radius * cap_length * num_convolutes * num_generations
 
     do j=1,num_generations
+
       int_radius = int_radius_in - (int_radius_in-int_radius_out)/num_generations*j
+
+      !capillary unit volume and surface area calculation - adding intermediate villous volume 
+      !and area for the generation
+      capillary_unit_vol = capillary_unit_vol + PI * int_radius**2 * int_length
+      capillary_unit_area = capillary_unit_area + 2 * PI * int_radius * int_length
 
       seg_resistance=(8.d0*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
       !calculate total resistance of terminal capillary conduits
@@ -724,17 +741,24 @@ contains
 
     terminal_length = terminal_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
 
+    total_cap_volume = capillary_unit_vol * num_units/1000 !in cm**3
+    total_cap_surface_area = capillary_unit_area * num_units/100 !in cm**2
+
     if(diagnostics_level.GE.2)then
       print *, "Resistance of capillary conduits=",cap_resistance
       print *, "Resistance of all generations of capillaries per terminal unit=",terminal_resistance
-      print *, "Effective length of each terminal unit (mm)",terminal_length
+      print *, "Effective length of each capillary unit (mm)",terminal_length
       print *, "Total capillary length for the vasculature (cm)",(terminal_length*num_units)/10
+      print *, "Total capillary volume (cm**3) = ",total_cap_volume
+      print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area
     endif
 
+    is_capillary_unit = 0
     !set the effective length of each capillary unit based the total resistance of capillary convolutes   
     do nu=1,num_units
       ne =units(nu) !Get a terminal unit    
       nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+      is_capillary_unit(nc) = 1
       !update element radius
       elem_field(ne_radius,nc) = cap_unit_radius
       !update element length   
@@ -759,17 +783,18 @@ contains
 !
 !###################################################################################
 !
-  subroutine define_1d_elements(ELEMFILE)
+  subroutine define_1d_elements(ELEMFILE,anastomosis_elem_in)
   !*Description:* Reads in an element ipelem file to define a geometry
     use arrays,only: dp, elem_direction,elem_field,elems,elem_cnct,elem_nodes,&
          elem_ordrs,elem_symmetry,elems_at_node,elem_units_below,&
-         node_xyz,num_elems,num_nodes
+         node_xyz,num_elems,num_nodes,elem_cnct_no_anast,anastomosis_elem
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_1D_ELEMENTS" :: DEFINE_1D_ELEMENTS
 
     character(len=MAX_FILENAME_LEN), intent(in) :: ELEMFILE
+    integer, optional :: anastomosis_elem_in
     !     Local Variables
     integer :: ibeg,iend,ierror,i_ss_end,j,ne,ne_global,&
          nn,np,np1,np2,np_global
@@ -781,6 +806,8 @@ contains
     sub_name = 'define_1d_elements'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
+
+    anastomosis_elem = anastomosis_elem_in
 
     open(10, file=ELEMFILE, status='old')
 
@@ -800,6 +827,8 @@ contains
     allocate(elems(num_elems))
     if(allocated(elem_cnct)) deallocate(elem_cnct)
     allocate(elem_cnct(-1:1,0:2,0:num_elems))
+    if(allocated(elem_cnct_no_anast)) deallocate(elem_cnct_no_anast)
+    allocate(elem_cnct_no_anast(-1:1,0:2,0:num_elems))
     if(allocated(elem_nodes)) deallocate(elem_nodes)
     allocate(elem_nodes(2,num_elems))
     if(allocated(elem_ordrs)) deallocate(elem_ordrs)
@@ -879,6 +908,7 @@ contains
     call enter_exit(sub_name,2)
 
   END subroutine define_1d_elements
+
 !
 !###################################################################################
 !
@@ -1419,7 +1449,7 @@ contains
   !*Description:* calculates generations, Horsfield orders, Strahler orders for a given tree
    
     use arrays,only: elem_cnct_no_anast,elem_nodes,elem_ordrs,elem_symmetry,&
-         elems_at_node,num_elems,num_nodes,maxgen
+         elems_at_node,num_elems,num_nodes,maxgen,anastomosis_elem
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
     !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_ORDERING" :: EVALUATE_ORDERING
@@ -1455,9 +1485,10 @@ contains
        maxgen=max(maxgen,elem_ordrs(1,ne))
 
     ENDDO !noelem
-	if(diagnostics_level.GT.1)then
-		print *,"branch generations - maxgen",maxgen
-	endif
+
+    if(diagnostics_level.GT.1)then
+	print *,"branch generations - maxgen",maxgen
+    endif
 
     !.....Calculate the branch orders
     DO ne=num_elems,1,-1
@@ -1490,6 +1521,14 @@ contains
        elem_ordrs(2,ne)=n_horsfield !store the Horsfield order
        elem_ordrs(3,ne)=STRAHLER+STRAHLER_ADD !Strahler order
     ENDDO !noelem
+
+    !if anastomosis element exists set its orders to 0
+    if(anastomosis_elem.GT.0)then
+	elem_ordrs(1,anastomosis_elem)=0
+	elem_ordrs(2,anastomosis_elem)=0
+	elem_ordrs(3,anastomosis_elem)=0
+    endif
+
 
     !       Check for disconnected nodes and number of inlets and outlets
     DUPLICATE=.FALSE.
