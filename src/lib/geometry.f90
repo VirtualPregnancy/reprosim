@@ -41,7 +41,8 @@ contains
     use arrays,only: dp,elems,elem_cnct,elem_direction,elem_field,&
          elem_nodes,elem_ordrs,elem_symmetry,elems_at_node,&
          nodes,node_xyz,num_elems,&
-         num_nodes,num_units,units,num_arterial_elems
+         num_nodes,num_units,units,num_arterial_elems,umbilical_inlets, &
+         umbilical_outlets
     use indices
     use other_consts,only: PI,MAX_STRING_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
@@ -60,12 +61,11 @@ contains
             nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter, &
             max_ne, max_elem_indx,umb_node_counter,node_no,no_umb_art_nodes, umb_elem,&
             inlet_counter,outlet_counter,j,umb_elems_count,umb_elem_indx,ierror,ntemp,dwn_elems, &
-            inlet1_np1,inlet2_np1,num_umb_nodes  
+            inlet1_np1,inlet2_np1,num_umb_nodes,umb_outlet_counter  
     integer, allocatable :: np_map(:)
     integer, allocatable :: ne_map(:)
-    integer :: umb_inlets(2) = 0
-    integer :: umb_outlets(2) = 0
-    integer :: umb_outlet_nodes(2) = 0
+    integer :: umb_art_outlets(2) = 0
+    integer :: umb_art_outlet_nodes(2) = 0
     integer :: umb_ven_elems(3) = 0 !umbilical venous elements
     integer :: umb_ven_nodes(4) = 0 !umbilical venous nodes
     integer, allocatable :: umb_art_nodes(:)
@@ -118,18 +118,6 @@ contains
        ! the number of elems after adding mesh will be:
        num_elems_new = 2*num_elems + num_units
 
-       !get the umbilical inlet element number(s) to print the element number of the venous outlets
-       inlet_counter = 0
-       do ne=1,num_elems
-          if(elem_cnct(-1,0,ne).EQ.0)then
-             inlet_counter = inlet_counter + 1
-             umb_inlets(inlet_counter) = ne
-             if(diagnostics_level.GE.1)then
-                print *,"umbilical inlet element number =",ne
-             endif
-          endif
-       enddo
-
     elseif(umbilical_elem_option.EQ.'single_umbilical_vein')then
        !populate the umbilical arterial nodes array and
        !find the inlet(s) and outlets in the umbilical elements
@@ -142,21 +130,14 @@ contains
        umb_node_counter = 0
        do noelem=1,umb_elems_count
 	  ne = umbilical_elems(noelem)
-	  if(elem_cnct(-1,0,ne).EQ.0)then
-             inlet_counter = inlet_counter + 1
-	     umb_inlets(inlet_counter) = ne !no upstream elements so this an inlet element
-             if(diagnostics_level.GE.1)then
-                print *,"umbilical inlet element number =",ne
-             endif
-	  endif
           !look for umbilical outlets = elements whose downstream elements are not umbilical elements themselves
           dwn_elems = elem_cnct(1,0,ne) !number of downstream elements
 	  if(dwn_elems.GT.0)then
 	     if(ALL(umbilical_elems.NE.elem_cnct(1,1,ne)))then
                 outlet_counter = outlet_counter + 1
-	        umb_outlets(outlet_counter) = ne
+	        umb_art_outlets(outlet_counter) = ne
 	        !store second nodes for mapping between arterial and venous elements
-                umb_outlet_nodes(outlet_counter) = elem_nodes(2,ne)
+                umb_art_outlet_nodes(outlet_counter) = elem_nodes(2,ne)
 	     endif
           endif
 
@@ -169,13 +150,8 @@ contains
           enddo
        enddo
 
-       if(count(umb_inlets.NE.0).EQ.0)then
-          print *,"inlet not found"
-	  call exit(1)
-       endif
-
-       if(count(umb_outlets.NE.0).EQ.0)then
-          print *,"umbilical outlets not found"
+       if(count(umb_art_outlets.NE.0).EQ.0)then
+          print *,"arterial umbilical outlets not found"
 	  call exit(1)
        endif
        
@@ -198,7 +174,8 @@ contains
     ne_global = num_elems ! assumes this is the highest element number (!!!)
     np0 = num_nodes ! the starting local node number
     np_global = num_nodes ! assumes this is the highest node number (!!!)
-    
+
+    umbilical_outlets = 0    
     if(umbilical_elem_option.EQ.'single_umbilical_vein')then
 
        node_counter = 1
@@ -212,7 +189,7 @@ contains
        do indx=1,2
           np=np_global+node_counter
           umb_ven_nodes(indx) = np
-          nonode = umb_outlet_nodes(indx)
+          nonode = umb_art_outlet_nodes(indx)
           np_m=nodes(nonode)
           np_map(np_m)=np !maps new to old node numbering
           nodes(np0+node_counter)=np
@@ -233,12 +210,12 @@ contains
        node_counter = node_counter + 1  
 
        !if two inlets then create a new node in between them
-       if(count(umb_inlets.NE.0).GT.1)then
+       if(count(umbilical_inlets.NE.0).GT.1)then
           np=np_global+node_counter
           umb_ven_nodes(4) = np
           nodes(np0+node_counter)=np
-          inlet1_np1 = elem_nodes(1,umb_inlets(1)) 
-          inlet2_np1 = elem_nodes(1,umb_inlets(2))    
+          inlet1_np1 = elem_nodes(1,umbilical_inlets(1)) 
+          inlet2_np1 = elem_nodes(1,umbilical_inlets(2))    
           do nj=1,3
              node_xyz(nj,np)=(node_xyz(nj,inlet1_np1)+node_xyz(nj,inlet2_np1))/2 + offset(nj)
           enddo
@@ -249,7 +226,7 @@ contains
           np=np_global+node_counter
           umb_ven_nodes(4) = np
           nodes(np0+node_counter)=np  
-          np1 = elem_nodes(1,umb_inlets(1)) 
+          np1 = elem_nodes(1,umbilical_inlets(1)) 
           do nj=1,3
              node_xyz(nj,np)=node_xyz(nj,np1) + offset(nj)
           enddo
@@ -295,15 +272,12 @@ contains
        !umbilical venous outlet element
        ne=ne_global+elem_counter
        umb_ven_elems(1)=ne
+       umbilical_outlets(1) = ne !store umbilical venous outlet
        elem_field(ne_group,ne)=2.0_dp!VEIN
        elems(ne0+elem_counter)=ne
        elem_nodes(1,ne)=umb_ven_nodes(3)
        elem_nodes(2,ne)=umb_ven_nodes(4)
-       elem_counter = elem_counter + 1
-
-       if(diagnostics_level.GE.1)then
-           print *,"umbilical outlet element number =",umb_ven_elems(1)
-       endif       
+       elem_counter = elem_counter + 1      
 
        !create an element between nodes 1 and 3
        ne=ne_global+elem_counter
@@ -334,12 +308,18 @@ contains
         enddo
     endif
 
+    umb_outlet_counter = 0
     do ne_m=1,num_elems
         !ne_m=elems(noelem)
         elem_field(ne_group,ne_m)=0.0_dp!ARTERY
         if((umbilical_elem_option.EQ.'same_as_arterial').OR. &
                     ((umbilical_elem_option.EQ.'single_umbilical_vein').AND.(ALL(umbilical_elems.NE.ne_m))))then
            ne=ne_global+elem_counter
+           !if copying arterial umbilical inlets, store venous umbilical outlets
+           if(.not.ALL(umbilical_inlets.NE.ne_m))then
+              umb_outlet_counter = umb_outlet_counter + 1
+              umbilical_outlets(umb_outlet_counter) = ne
+           endif
            elem_field(ne_group,ne)=2.0_dp!VEIN
            elems(ne0+elem_counter)=ne
            ne_map(ne_m)=ne !maps new to old element numbering
@@ -362,11 +342,10 @@ contains
         endif
     enddo 
 
-    if((umbilical_elem_option.EQ.'same_as_arterial').AND.(diagnostics_level.GE.1))then
-       do inlet_counter=1,2
-          umb_elem = umb_inlets(inlet_counter)
-          if(umb_elem.GT.0)then
-             print *,"umbilical outlet element number",ne_map(umb_elem)
+    if(diagnostics_level.GE.1)then
+       do umb_outlet_counter=1,2
+          if(umbilical_outlets(umb_outlet_counter).GT.0)then
+             print *,"venous umbilical outlet element number",umbilical_outlets(umb_outlet_counter)
           endif
        enddo
     endif
@@ -427,21 +406,21 @@ contains
 
         !element orders for the first new element - the same as the arterial inlet
         nindex=no_gen
-        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umb_inlets(1))
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(1))
         nindex=no_sord
-        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umb_inlets(1))
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(1))
         nindex=no_hord
-        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umb_inlets(1))
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(1))
 
         !element orders for the second and third new element - the same as the arterial 
         !umbilical outlets
         do indx=2,3
            nindex=no_gen
-           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_outlets(indx-1))
+           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_art_outlets(indx-1))
            nindex=no_sord
-           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_outlets(indx-1))
+           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_art_outlets(indx-1))
            nindex=no_hord
-           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_outlets(indx-1))
+           elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_art_outlets(indx-1))
         enddo
 
      endif !umbilical_elem_option
@@ -787,7 +766,8 @@ contains
   !*Description:* Reads in an element ipelem file to define a geometry
     use arrays,only: dp, elem_direction,elem_field,elems,elem_cnct,elem_nodes,&
          elem_ordrs,elem_symmetry,elems_at_node,elem_units_below,&
-         node_xyz,num_elems,num_nodes,elem_cnct_no_anast,anastomosis_elem
+         node_xyz,num_elems,num_nodes,elem_cnct_no_anast,anastomosis_elem, &
+         umbilical_inlets
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
@@ -797,7 +777,7 @@ contains
     integer, optional :: anastomosis_elem_in
     !     Local Variables
     integer :: ibeg,iend,ierror,i_ss_end,j,ne,ne_global,&
-         nn,np,np1,np2,np_global
+         nn,np,np1,np2,np_global,inlet_counter
     character(LEN=132) :: ctemp1
     character(LEN=40) :: sub_string
     character(len=60) :: sub_name
@@ -903,6 +883,25 @@ contains
     enddo
 
     call element_connectivity_1d
+
+
+    !populate umbilical_inlets array
+    inlet_counter = 0
+    umbilical_inlets = 0
+    do ne=1,num_elems
+       if(elem_cnct(-1,0,ne).EQ.0)then
+          inlet_counter = inlet_counter + 1
+          umbilical_inlets(inlet_counter) = ne
+          if(diagnostics_level.GE.1)then
+             print *,"umbilical inlet element number =",ne
+          endif
+       endif
+    enddo
+    if(count(umbilical_inlets.NE.0).EQ.0)then
+       print *,"inlet not found"
+       call exit(1)
+    endif
+
     call evaluate_ordering
 
     call enter_exit(sub_name,2)
@@ -1257,24 +1256,24 @@ contains
     	endif
     !Define start element
     if(group_type.ne.'venous')then
-    		if(START_FROM.eq.'inlet')then
-      	inlet_count=0
-      		do ne=ne_min,ne_max
-         		if(elem_cnct(-1,0,ne).eq.0)then
-           			inlet_count=inlet_count+1
-           			ne_start=ne
-         		endif
-      		enddo
-      		if(inlet_count.gt.1)then
-               WRITE(*,*) ' More than one inlet in this group, using last found, ne = ',ne_start
-            endif
-    		else!element number defined
-       		read (START_FROM,'(I10)') ne_start
-    		endif
-	endif
-	if(diagnostics_level.GT.1)then
-		print *, "ne_start=",ne_start
-	endif
+       if(START_FROM.eq.'inlet')then
+          inlet_count=0
+      	  do ne=ne_min,ne_max
+             if(elem_cnct(-1,0,ne).eq.0)then
+                inlet_count=inlet_count+1
+                ne_start=ne
+             endif
+      	  enddo
+      	  if(inlet_count.gt.1)then
+             WRITE(*,*) ' More than one inlet in this group, using last found, ne = ',ne_start
+          endif
+       else!element number defined
+          read (START_FROM,'(I10)') ne_start
+       endif
+    endif
+    if(diagnostics_level.GT.1)then
+       print *, "ne_start=",ne_start
+    endif
 
     !Strahler and Horsfield ordering system
     if(ORDER_SYSTEM(1:5).EQ.'strah')THEN

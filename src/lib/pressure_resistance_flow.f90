@@ -346,7 +346,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
                   elem_field,num_units,units,elem_cnct,elem_ordrs, &
                   num_conv,num_conv_gen,cap_resistance,terminal_resistance, &
                   terminal_length,total_vasc_resistance, is_capillary_unit, &
-                  total_cap_volume,total_cap_surface_area
+                  total_cap_volume,total_cap_surface_area, umbilical_inlets, &
+                  umbilical_outlets,elem_nodes,node_field
     use other_consts, only: PI,MAX_FILENAME_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
@@ -355,11 +356,13 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
     real(dp), intent(in) :: image_voxel_size
   !local variables
     integer :: ne,nu,nc,order,max_strahler,no_branches, &
-               ne_order,branch,ven_elems,max_gen
+               ne_order,branch,ven_elems,max_gen,np1,np2, &
+               inlet_counter,inlet_elem,outlet_elem
     real(dp) :: arterial_vasc_volume, total_vasc_volume, venous_vasc_volume, &
                 mean_diameter,std_diameter,total_resistance,std_terminal_flow, &
                 cof_var_terminal_flow,mean_terminal_flow,small_vessel_volume, diameter, &
-                cap_length,cof_var_cap_flow
+                cap_length,cof_var_cap_flow,inlet_flow,inlet_pressure,outlet_pressure, &
+                resistance
     integer :: strahler_orders(num_elems)
     integer :: generations(num_elems)
     real(dp),allocatable :: diameter_by_strahler(:,:)
@@ -431,6 +434,31 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
 
    !total vascular resistance
    print *, "Total vascular resistance (Pa.s/mm**3) = ",total_vasc_resistance
+
+   !compare the above to resistance calculated by (Pressure in - Pressure out)/Blood Flow in
+   inlet_flow = 0.0_dp
+   inlet_pressure = 0.0_dp
+   do inlet_counter=1,2
+      inlet_elem = umbilical_inlets(inlet_counter)
+      if(inlet_elem.GT.0)then
+         inlet_flow = inlet_flow + elem_field(ne_Qdot,inlet_elem)
+         !get the first node
+         np1 = elem_nodes(1,inlet_elem)
+         inlet_pressure = node_field(nj_bv_press,np1)
+      endif   
+   enddo
+
+   outlet_pressure = 0.0_dp
+   if(umbilical_outlets(1).GT.0)then
+      outlet_elem = umbilical_outlets(1)
+   else !get the first unit
+      outlet_elem = units(1)
+   endif
+   !get the second node
+   np2 = elem_nodes(2,outlet_elem)
+   outlet_pressure = node_field(nj_bv_press,np2)
+   resistance = (inlet_pressure - outlet_pressure)/inlet_flow
+   print *, "Total vascular resistance (Pin-Pout)/Flow (Pa.s/mm**3) = ",resistance
 
    !mean, min, max and std of branch diameter by Strahler order
 
@@ -719,9 +747,12 @@ subroutine tree_resistance(resistance)
       do num2=1,elem_cnct(1,0,ne)
          ne2=elem_cnct(1,num2,ne)
          invres=invres+1.0_dp/elem_res(ne2) !resistance in parallel, for daughter branches
+         print *,"ne =",ne,"ne2=",ne2,"invres =",invres
       enddo
-      if(elem_cnct(1,0,ne).gt.0)then 
+      if(elem_cnct(1,0,ne).gt.0)then
+        print *, "before adding resistance in series elem_res=", elem_res(ne) 
         elem_res(ne)=elem_res(ne)+1.0_dp/invres !resistance in a series
+        print *, "elem_res=", elem_res(ne)
        endif
     enddo
     resistance=elem_res(1)
