@@ -69,6 +69,8 @@ contains
     integer :: umb_ven_elems(3) = 0 !umbilical venous elements
     integer :: umb_ven_nodes(4) = 0 !umbilical venous nodes
     integer, allocatable :: umb_art_nodes(:)
+    integer, allocatable :: umb_art_nodes_tmp(:)
+    integer, allocatable :: umb_art_nodes_tmp2(:)
     integer :: umbilical_elems(20) = 0
     integer :: index, i
     character(LEN=132) :: ctemp1
@@ -122,7 +124,38 @@ contains
        !populate the umbilical arterial nodes array and
        !find the inlet(s) and outlets in the umbilical elements
 
-       allocate(umb_art_nodes(umb_elems_count + 1))
+       !Count the number of nodes attached to the umbilical arteries
+       allocate(umb_art_nodes_tmp(umb_elems_count*2))
+       allocate(umb_art_nodes_tmp2(umb_elems_count*2))
+       umb_node_counter = 0
+       do noelem=1,umb_elems_count
+         ne = umbilical_elems(noelem)
+         do node_no=1,2
+           umb_node_counter = umb_node_counter + 1
+           np = elem_nodes(node_no,ne)
+           umb_art_nodes_tmp(umb_node_counter) = np
+         enddo
+       enddo
+
+       !The following 14 lines are modified from https://www.rosettacode.org/wiki/Remove_duplicate_elements
+       umb_node_counter = 1
+       umb_art_nodes_tmp2(1) = umb_art_nodes_tmp(1)
+       outer: do i=2,size(umb_art_nodes_tmp)
+         do j=1,umb_node_counter
+          if (umb_art_nodes_tmp2(j) == umb_art_nodes_tmp(i)) then
+           ! Found a match so start looking again
+           cycle outer
+        endif
+        enddo
+        ! No match found so add it to the output
+        umb_node_counter = umb_node_counter + 1
+        umb_art_nodes_tmp2(umb_node_counter) = umb_art_nodes_tmp(i)
+       end do outer
+
+
+       allocate(umb_art_nodes(umb_node_counter)) !ARC: we might be able to just define umb_art_nodes here from the above, but I leave as i havent checked if ordering matters
+       deallocate(umb_art_nodes_tmp)
+       deallocate(umb_art_nodes_tmp2)
        umb_art_nodes = 0
 
        inlet_counter = 0
@@ -1322,7 +1355,7 @@ contains
 !###########################################################################
 !
   subroutine element_connectivity_1d()
-  !*Description:* Calculates element connectivity in 1D and stores in elelem_cnct
+  !*Description:* Calculates element connectivity in 1D and stores in elem_cnct
     use arrays,only: elem_cnct,elem_nodes,elems_at_node,num_elems,num_nodes,elem_cnct_no_anast,&
                      anastomosis_elem
     use diagnostics, only: enter_exit,get_diagnostics_level
@@ -1379,8 +1412,6 @@ contains
 		enddo
 		call exit(0)
     endif
-
-    ! calculate elem_cnct array: stores the connectivity of all elements
     
     elem_cnct=0 !initialise all elem_cnct
     elem_cnct_no_anast = 0 !initialise
@@ -1433,6 +1464,23 @@ contains
        	    		print *,"total number of downstream elements:",elem_cnct(1,0,ne)
        			DO counter=1,elem_cnct(1,0,ne)
           			print *,"downstream element",elem_cnct(1,counter,ne)
+       	    		ENDDO
+       		ENDIF
+    		ENDDO
+                print *,"element connectivity without the anastomosis:"
+  		DO ne=1,num_elems
+   	    		print *,""
+   	    		print *,"element",ne 
+       		IF(elem_cnct_no_anast(-1,0,ne).gt.0)THEN
+       	    		print *,"total number of upstream elements:",elem_cnct_no_anast(-1,0,ne)
+       			DO counter=1,elem_cnct_no_anast(-1,0,ne)
+          			print *,"upstream element",elem_cnct_no_anast(-1,counter,ne)
+       	    		ENDDO
+       		ENDIF
+       		IF(elem_cnct_no_anast(1,0,ne).gt.0)THEN
+       	    		print *,"total number of downstream elements:",elem_cnct_no_anast(1,0,ne)
+       			DO counter=1,elem_cnct_no_anast(1,0,ne)
+          			print *,"downstream element",elem_cnct_no_anast(1,counter,ne)
        	    		ENDDO
        		ENDIF
     		ENDDO

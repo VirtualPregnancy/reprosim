@@ -345,7 +345,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
     use arrays,only: num_arterial_elems,dp,num_elems, &
                   elem_field,num_units,units,elem_cnct,elem_ordrs, &
                   num_conv,num_conv_gen,cap_resistance,terminal_resistance, &
-                  terminal_length,total_vasc_resistance, is_capillary_unit, &
+                  terminal_length, is_capillary_unit, &
                   total_cap_volume,total_cap_surface_area, umbilical_inlets, &
                   umbilical_outlets,elem_nodes,node_field
     use other_consts, only: PI,MAX_FILENAME_LEN
@@ -432,10 +432,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
    print *, "Resistance of all generations of capillaries per terminal unit (Pa.s/mm**3)=",terminal_resistance
    print *, "Effective length of each terminal unit (mm)",terminal_length
 
-   !total vascular resistance
-   print *, "Total vascular resistance (Pa.s/mm**3) = ",total_vasc_resistance
-
-   !compare the above to resistance calculated by (Pressure in - Pressure out)/Blood Flow in
+ 
+   !calculate total vascular resistance (Pressure in - Pressure out)/Blood Flow in
    inlet_flow = 0.0_dp
    inlet_pressure = 0.0_dp
    do inlet_counter=1,2
@@ -726,37 +724,60 @@ end subroutine calc_depvar_maps
 !##################################################################
 !
 subroutine tree_resistance(resistance)
-!*Descripton:* This subroutine calculates the total resistance of a tree
+!*Descripton:* This subroutine calculates the approximate
+! total resistance of a tree so that the solution can be initialised.
+! It underestimates the resistance of venous vessels (converging tree)
+! as some are added in parallel instead of in a series
     use indices
-    use arrays,only: dp,num_elems,elem_cnct,elem_field,&
-                     total_vasc_resistance
-    use diagnostics, only: enter_exit
+    use arrays,only: dp,num_elems,elem_field,&
+                     elem_cnct,umbilical_inlets,&
+                     anastomosis_elem
+    use diagnostics, only: enter_exit,get_diagnostics_level
     character(len=60) :: sub_name
 !local variables
     real(dp), intent(out) :: resistance
     real(dp) :: invres,elem_res(num_elems)
-    integer :: num2,ne,ne2
+    integer :: num2,ne,ne2,num_connected_elems,inlet_counter,&
+               daughter_counter
+    integer :: diagnostics_level
 
     sub_name = 'tree_resistance'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
 
     elem_res(1:num_elems)=elem_field(ne_resist,1:num_elems)
+
     do ne=num_elems,1,-1
        !ne=elems(num)
-      invres=0.0_dp
-      do num2=1,elem_cnct(1,0,ne)
-         ne2=elem_cnct(1,num2,ne)
-         invres=invres+1.0_dp/elem_res(ne2) !resistance in parallel, for daughter branches
-         print *,"ne =",ne,"ne2=",ne2,"invres =",invres
-      enddo
-      if(elem_cnct(1,0,ne).gt.0)then
-        print *, "before adding resistance in series elem_res=", elem_res(ne) 
-        elem_res(ne)=elem_res(ne)+1.0_dp/invres !resistance in a series
-        print *, "elem_res=", elem_res(ne)
+       invres=0.0_dp
+       !exclude the anastomosis element if one exists
+       if((anastomosis_elem.EQ.0).OR.(ne.NE.anastomosis_elem))then  
+          num_connected_elems = elem_cnct(1,0,ne)
+          if(num_connected_elems.GT.0)then
+             daughter_counter = 0
+             do num2=1,num_connected_elems
+                ne2=elem_cnct(1,num2,ne)
+                if((anastomosis_elem.EQ.0).OR.(ne2.NE.anastomosis_elem))then 
+                   invres=invres+1.0_dp/elem_res(ne2) !resistance in parallel, for daughter branches
+                   daughter_counter = daughter_counter + 1
+                endif   
+             enddo
+             if(daughter_counter.GT.0)then
+                elem_res(ne)=elem_res(ne)+1.0_dp/invres !resistance in a series
+             endif
+          endif
        endif
     enddo
-    resistance=elem_res(1)
-    total_vasc_resistance = resistance
+
+    !calculate total tree resistance by summing resistances at each inlet in parallel
+    resistance = 0
+    do inlet_counter=1,count(umbilical_inlets.NE.0)
+       resistance = resistance + 1.0_dp/elem_res(umbilical_inlets(inlet_counter)) !resistance in parallel
+    enddo
+    resistance = 1.0_dp/resistance
+    if(diagnostics_level.GT.0)then
+       print *,"tree resistance to initialise solution: ",resistance
+    endif
 
     call enter_exit(sub_name,2)
 end subroutine tree_resistance
