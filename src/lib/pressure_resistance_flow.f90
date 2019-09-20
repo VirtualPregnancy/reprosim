@@ -456,6 +456,13 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
    np2 = elem_nodes(2,outlet_elem)
    outlet_pressure = node_field(nj_bv_press,np2)
    resistance = (inlet_pressure - outlet_pressure)/inlet_flow
+
+   print *, "Inlet pressure = (Pa)", inlet_pressure
+   print *, "Inlet pressure = (mmHg)", inlet_pressure/133.322_dp
+   print *, "Outlet pressure = (Pa)", outlet_pressure
+   print *, "Outlet pressure = (mmHg)", outlet_pressure/133.322_dp
+   print *, "Flow (sum of all inlet flows) = (mm3/s)", inlet_flow
+   print *, "Flow (sum of all inlet flows) = (ml/min)", inlet_flow * 0.06_dp
    print *, "Total vascular resistance (Pin-Pout)/Flow (Pa.s/mm**3) = ",resistance
 
    !mean, min, max and std of branch diameter by Strahler order
