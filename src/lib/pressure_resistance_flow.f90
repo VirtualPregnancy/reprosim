@@ -755,7 +755,6 @@ subroutine tree_resistance(resistance)
     elem_res(1:num_elems)=elem_field(ne_resist,1:num_elems)
 
     do ne=num_elems,1,-1
-       !ne=elems(num)
        invres=0.0_dp
        !exclude the anastomosis element if one exists
        if((anastomosis_elem.EQ.0).OR.(ne.NE.anastomosis_elem))then  
