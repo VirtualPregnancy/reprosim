@@ -393,13 +393,16 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
 
    total_vasc_volume = 0
    do ne = 1,num_elems
-      total_vasc_volume = total_vasc_volume + elem_field(ne_vol,ne)
+         if(is_capillary_unit(ne).eq.0)then
+            total_vasc_volume = total_vasc_volume + elem_field(ne_vol,ne)
+         endif   
    enddo
-   print *, "Total vascular volume (cm**3) = ",total_vasc_volume/1000
+   venous_vasc_volume = total_vasc_volume - arterial_vasc_volume
+   print *, "Venous vascular volume (cm**3) = ",venous_vasc_volume/1000
 
-   venous_vasc_volume = (total_vasc_volume - arterial_vasc_volume)/1000 
-   venous_vasc_volume = venous_vasc_volume - total_cap_volume 
-   print *, "Venous vascular volume (cm**3) = ",venous_vasc_volume
+   !add capillary volume to total vascular volume
+   total_vasc_volume = total_vasc_volume/1000 + total_cap_volume !in cm3
+   print *, "Total vascular volume (cm**3) = ",total_vasc_volume
 
    if(image_voxel_size.GT.0)then
       !volume of vessels with diameter smaller than image voxel size
