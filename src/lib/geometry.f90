@@ -61,13 +61,15 @@ contains
             nj,ne_m,noelem,ne0,n,nindex,ne1,noelem0,nu,cap_conns,cap_term,np1,np2,counter, &
             max_ne, max_elem_indx,umb_node_counter,node_no,no_umb_art_nodes, umb_elem,&
             inlet_counter,outlet_counter,j,umb_elems_count,umb_elem_indx,ierror,ntemp,dwn_elems, &
-            inlet1_np1,inlet2_np1,num_umb_nodes,umb_outlet_counter  
+            inlet1_np1,inlet2_np1,num_umb_nodes,umb_outlet_counter,inlet_with_gt_orders  
     integer, allocatable :: np_map(:)
     integer, allocatable :: ne_map(:)
     integer :: umb_art_outlets(2) = 0
     integer :: umb_art_outlet_nodes(2) = 0
     integer :: umb_ven_elems(3) = 0 !umbilical venous elements
     integer :: umb_ven_nodes(4) = 0 !umbilical venous nodes
+    integer :: inlet_sord(2) = 0 !Strahler orders for arterial inlets
+    integer :: inlet_hord(2) = 0 !Horsfield orders for arterial inlets    
     integer, allocatable :: umb_art_nodes(:)
     integer, allocatable :: umb_art_nodes_tmp(:)
     integer, allocatable :: umb_art_nodes_tmp2(:)
@@ -438,12 +440,24 @@ contains
         enddo
 
         !element orders for the first new element - the same as the arterial inlet
+        !if two inlets, copy greater Strahler and Horsfield orders; generation for 
+        !each inlet is 1
+        inlet_with_gt_orders = 1
+        if(count(umbilical_inlets.NE.0).GT.1)then
+           do indx=1,2
+              inlet_sord(indx) = elem_ordrs(no_sord,umbilical_inlets(indx))
+              inlet_hord(indx) = elem_ordrs(no_hord,umbilical_inlets(indx))
+           enddo
+           if((inlet_sord(1).LT.inlet_sord(2)).OR.(inlet_hord(1).LT.inlet_hord(2)))then
+              inlet_with_gt_orders = 2
+           endif
+        endif
         nindex=no_gen
-        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(1))
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(inlet_with_gt_orders))
         nindex=no_sord
-        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(1))
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(inlet_with_gt_orders))
         nindex=no_hord
-        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(1))
+        elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(inlet_with_gt_orders))
 
         !element orders for the second and third new element - the same as the arterial 
         !umbilical outlets
