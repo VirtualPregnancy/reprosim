@@ -177,6 +177,33 @@ contains
 !
 !###########################################################################
 !
+  subroutine define_ven_rad_from_art_c(FILENAME, filename_len,&
+          factor) bind(C, name="define_ven_rad_from_art_c")
+
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_FILENAME_LEN
+    use geometry, only: define_ven_rad_from_art
+    use arrays, only: dp
+    implicit none
+
+    integer,intent(in) :: filename_len
+    type(c_ptr), value, intent(in) :: FILENAME
+    real(dp),intent(in) :: factor
+    character(len=MAX_FILENAME_LEN) :: filename_f
+
+    call strncpy(filename_f, FILENAME, filename_len)
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_define_ven_rad_from_art(filename_f, factor)
+#else
+    call define_ven_rad_from_art(filename_f,factor)
+#endif
+
+    end subroutine define_ven_rad_from_art_c
+!
+!##################################################################################
+!
 !*element_connectivity_1d:*  Calculates element connectivity in 1D and stores in elelem_cnct
   subroutine element_connectivity_1d_c() bind(C, name="element_connectivity_1d_c")
     use geometry, only: element_connectivity_1d
