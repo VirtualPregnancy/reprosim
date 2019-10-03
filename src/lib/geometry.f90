@@ -19,6 +19,7 @@ module geometry
   public define_node_geometry
   public define_rad_from_file
   public define_rad_from_geom
+  public define_ven_rad_from_art
   public element_connectivity_1d
   public evaluate_ordering
   public get_final_real
@@ -42,7 +43,7 @@ contains
          elem_nodes,elem_ordrs,elem_symmetry,elems_at_node,&
          nodes,node_xyz,num_elems,&
          num_nodes,num_units,units,num_arterial_elems,umbilical_inlets, &
-         umbilical_outlets
+         umbilical_outlets, art_ven_elem_map
     use indices
     use other_consts,only: PI,MAX_STRING_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
@@ -202,6 +203,7 @@ contains
     np_map = 0
     allocate(ne_map(num_elems))
     ne_map = 0
+    allocate(art_ven_elem_map(num_elems))
     !!! increase the size of node and element arrays to accommodate the additional elements
  
     call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
@@ -377,6 +379,9 @@ contains
         endif
     enddo 
 
+    !populate mapping between arterial and venous elements (for radius from file option)
+    art_ven_elem_map = ne_map
+
     if(diagnostics_level.GE.1)then
        do umb_outlet_counter=1,2
           if(umbilical_outlets(umb_outlet_counter).GT.0)then
@@ -459,6 +464,9 @@ contains
         nindex=no_hord
         elem_ordrs(nindex,umb_ven_elems(1))=elem_ordrs(nindex,umbilical_inlets(inlet_with_gt_orders))
 
+        !populate mapping between arterial and venous elements (for radius from file option)
+        art_ven_elem_map(umbilical_inlets(inlet_with_gt_orders)) = umb_ven_elems(1)
+
         !element orders for the second and third new element - the same as the arterial 
         !umbilical outlets
         do indx=2,3
@@ -468,6 +476,9 @@ contains
            elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_art_outlets(indx-1))
            nindex=no_hord
            elem_ordrs(nindex,umb_ven_elems(indx))=elem_ordrs(nindex,umb_art_outlets(indx-1))
+
+           !populate mapping between arterial and venous elements (for radius from file option)
+           art_ven_elem_map(umb_art_outlets(indx-1)) = umb_ven_elems(indx)
         enddo
 
      endif !umbilical_elem_option
@@ -1091,7 +1102,8 @@ contains
   ! the radius field file, define_rad_from_geometry must be used for the venous vessels.
 
     use arrays,only: dp,elem_field,elem_cnct,elem_nodes,&
-         elems_at_node,num_elems,num_nodes, num_arterial_elems, elem_ordrs
+         elems_at_node,num_elems,num_nodes, num_arterial_elems, elem_ordrs, &
+         umbilical_inlets
     use indices,only: ne_length,ne_radius,ne_radius_in,ne_radius_out,no_sord, &
                     no_hord,ne_vol 
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
@@ -1106,11 +1118,13 @@ contains
     !     Local Variables
     real(dp), allocatable :: node_radius(:)
     integer :: ierror,ne,np,np1,np2,np_global,surround,radii_num_nodes, &
-               minelem_no_radius,start_elem,n_max_ord,nindex,remaining_elems
+               minelem_no_radius,start_elem,n_max_ord,nindex,remaining_elems, &
+               indx
     character(LEN=132) :: ctemp1
     LOGICAL :: versions
     real(dp) :: radius,start_rad
     character(len=MAX_STRING_LEN) ::  venous_option
+    integer :: inlet_ord(2) = 0 !Strahler or Horsfield orders for arterial inlets
     character(len=60) :: sub_name
     integer :: diagnostics_level
 
@@ -1209,9 +1223,18 @@ contains
           nindex = no_hord !for Horsfield ordering
        endif
 
-       ! get the radius of element upstream of the first element that doesn't
-       ! yet have a radius
-       start_elem = elem_cnct(-1,1,minelem_no_radius)
+       ! get the inlet element 
+       ! if two inlets, get the one with a higher order
+       start_elem = umbilical_inlets(1)
+       if(count(umbilical_inlets.NE.0).GT.1)then
+           do indx=1,2
+              inlet_ord(indx) = elem_ordrs(nindex,umbilical_inlets(indx))
+           enddo
+           if(inlet_ord(1).LT.inlet_ord(2))then
+              start_elem = umbilical_inlets(2)
+           endif
+       endif
+
        start_rad = elem_field(ne_radius,start_elem)
        n_max_ord = elem_ordrs(nindex,start_elem)
 
@@ -1244,8 +1267,7 @@ contains
        elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
             elem_field(ne_length,ne)
     enddo
-   
-
+    
     call enter_exit(sub_name,2)
 
   END subroutine define_rad_from_file
@@ -1255,7 +1277,7 @@ contains
 
   subroutine define_rad_from_geom(ORDER_SYSTEM, CONTROL_PARAM, START_FROM, START_RAD, group_type_in, group_option_in)
   !*Description:* Defines vessel radius based on their geometric structure
-    use arrays,only: dp,num_elems,elem_field,elem_ordrs,maxgen,elem_cnct,num_arterial_elems
+    use arrays,only: dp,num_elems,elem_field,elem_ordrs,maxgen,elem_cnct,num_arterial_elems            
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
@@ -1367,6 +1389,75 @@ contains
   END subroutine define_rad_from_geom
 !
 !###########################################################################
+!
+  subroutine define_ven_rad_from_art(FILENAME,factor)
+  !*Description:* Sets venous radii to corresponding arterial radii * factor
+  !   (default factor is 2). 
+  ! Prints arterial and corresponding venous radii to a file.  
+
+    use arrays,only: dp,elem_field,num_elems,num_arterial_elems, elem_ordrs,&
+                 art_ven_elem_map
+    use indices,only: ne_length,ne_radius,no_sord,ne_vol 
+    use other_consts, only: MAX_FILENAME_LEN
+    use diagnostics, only: enter_exit,get_diagnostics_level
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_VEN_RAD_FROM_ART" :: DEFINE_VEN_RAD_FROM_ART
+
+    character(len=MAX_FILENAME_LEN), intent(in) :: FILENAME
+    real(dp), optional :: factor
+
+    !     Local Variables
+    real(dp), allocatable :: node_radius(:)
+    integer :: ne,ne_art,ne_ven,art_sord,ven_sord
+    real(dp) :: art_radius,ven_radius,rad_difference
+    character(len=MAX_STRING_LEN) ::  venous_option
+    character(len=60) :: sub_name
+    integer :: diagnostics_level
+
+    sub_name = 'define_ven_rad_from_art'
+    call enter_exit(sub_name,1)
+    
+    !set venous radii to corresponding arterial radii * factor
+    do ne_art=1,num_arterial_elems
+       ne_ven = art_ven_elem_map(ne_art)
+       if(ne_ven.GT.0)then
+          art_radius = elem_field(ne_radius,ne_art)
+          elem_field(ne_radius,ne_ven) = elem_field(ne_radius,ne_art) * factor
+       endif
+    enddo 
+
+    !calculate element volume
+    do ne=num_arterial_elems+1,num_elems
+       elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
+            elem_field(ne_length,ne)
+    enddo
+
+    !print arterial and venous radii to a file 
+    open(10, file=FILENAME, status="replace")
+    write(10,*) 'arterial_elem,art_Strahler_order,arterial_elem_radius,venous_elem,&
+                      ven_Strahler_order,venous_elem_radius,difference'
+    !arterial elements and their matching venous elements
+    do ne_art=1,num_arterial_elems
+       ne_ven = art_ven_elem_map(ne_art)
+       art_radius = elem_field(ne_radius,ne_art)
+       art_sord = elem_ordrs(no_sord,ne_art)
+       if(ne_ven.GT.0)then
+          ven_radius = elem_field(ne_radius,ne_ven)
+          ven_sord = elem_ordrs(no_sord,ne_ven)
+          rad_difference = art_radius - ven_radius
+          write(10,*) ne_art,',',art_sord, ',',art_radius,',',ne_ven,',',&
+                       ven_sord,',',ven_radius,',',rad_difference
+       else
+          write(10,*) ne_art, ',',art_sord, ',', art_radius,',', 0, ',', 0,',', 0.0_dp, ',', 0.0_dp
+       endif
+    enddo
+    close(10)
+  
+    call enter_exit(sub_name,2)
+
+  END subroutine define_ven_rad_from_art
+!
+!##################################################################################
 !
   subroutine element_connectivity_1d()
   !*Description:* Calculates element connectivity in 1D and stores in elem_cnct
@@ -1617,6 +1708,13 @@ contains
        ENDIF
     ENDDO
   
+    do ne=1,num_elems
+       if(elem_ordrs(3,ne).EQ.0)then
+          if((anastomosis_elem.EQ.0).OR.((anastomosis_elem.GT.0).AND.(ne.NE.anastomosis_elem)))then
+             print *, "Warning: element", ne,"was assigned Strahler order 0"
+          endif
+       endif
+    enddo
 
     if(diagnostics_level.GT.1)then 
        do ne=1,num_elems
