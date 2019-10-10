@@ -345,9 +345,9 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
     use arrays,only: num_arterial_elems,dp,num_elems, &
                   elem_field,num_units,units,elem_cnct,elem_ordrs, &
                   num_conv,num_conv_gen,cap_resistance,terminal_resistance, &
-                  terminal_length, is_capillary_unit, &
+                  terminal_length, is_capillary_unit,elem_cnct_no_anast, &
                   total_cap_volume,total_cap_surface_area, umbilical_inlets, &
-                  umbilical_outlets,elem_nodes,node_field
+                  umbilical_outlets,elem_nodes,node_field,elem_units_below
     use other_consts, only: PI,MAX_FILENAME_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
@@ -357,12 +357,13 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
   !local variables
     integer :: ne,nu,nc,order,max_strahler,no_branches, &
                ne_order,branch,ven_elems,max_gen,np1,np2, &
-               inlet_counter,inlet_elem,outlet_elem
+               inlet_counter,inlet_elem,outlet_elem,n,num_units1
     real(dp) :: arterial_vasc_volume, total_vasc_volume, venous_vasc_volume, &
                 mean_diameter,std_diameter,total_resistance,std_terminal_flow, &
                 cof_var_terminal_flow,mean_terminal_flow,small_vessel_volume, diameter, &
                 cap_length,cof_var_cap_flow,inlet_flow,inlet_pressure,outlet_pressure, &
-                resistance
+                resistance,volume_fed_by_inlet,mean_terminal_flow1,mean_terminal_flow2,&
+                std_terminal_flow1,std_terminal_flow2
     integer :: strahler_orders(num_elems)
     integer :: generations(num_elems)
     real(dp),allocatable :: diameter_by_strahler(:,:)
@@ -371,6 +372,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
     real(dp),allocatable :: terminal_flow_by_gen(:,:)
     integer,allocatable :: branch_count(:)
     integer,allocatable :: gen_branch_count(:)
+    logical :: elems_under_inlet1(num_arterial_elems)
+    logical :: elems_under_inlet2(num_arterial_elems)
     character(len=60) :: sub_name
     integer :: diagnostics_level
 
@@ -431,9 +434,9 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
    !Print capillary convolute number, generations and total length of capillaries
    print *, "Number of capillary convolutes per generation = ",num_conv
    print *, "Number of capillary generations per terminal unit = ",num_conv_gen
-   print *, "Resistance of capillary conduits (Pa.s/mm**3)=",cap_resistance
-   print *, "Resistance of all generations of capillaries per terminal unit (Pa.s/mm**3)=",terminal_resistance
-   print *, "Effective length of each terminal unit (mm)",terminal_length
+   print *, "Resistance of capillary conduits (Pa.s/mm**3) =",cap_resistance
+   print *, "Resistance of all generations of capillaries per terminal unit (Pa.s/mm**3) =",terminal_resistance
+   print *, "Effective length of each terminal unit (mm) =",terminal_length
 
  
    !calculate total vascular resistance (Pressure in - Pressure out)/Blood Flow in
@@ -460,12 +463,12 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
    outlet_pressure = node_field(nj_bv_press,np2)
    resistance = (inlet_pressure - outlet_pressure)/inlet_flow
 
-   print *, "Inlet pressure = (Pa)", inlet_pressure
-   print *, "Inlet pressure = (mmHg)", inlet_pressure/133.322_dp
-   print *, "Outlet pressure = (Pa)", outlet_pressure
-   print *, "Outlet pressure = (mmHg)", outlet_pressure/133.322_dp
-   print *, "Flow (sum of all inlet flows) = (mm3/s)", inlet_flow
-   print *, "Flow (sum of all inlet flows) = (ml/min)", inlet_flow * 0.06_dp
+   print *, "Inlet pressure (Pa) =", inlet_pressure
+   print *, "Inlet pressure (mmHg) = ", inlet_pressure/133.322_dp
+   print *, "Outlet pressure (Pa) =", outlet_pressure
+   print *, "Outlet pressure (mmHg) =", outlet_pressure/133.322_dp
+   print *, "Flow (sum of all inlet flows) (mm3/s) =", inlet_flow
+   print *, "Flow (sum of all inlet flows) (ml/min) =", inlet_flow * 0.06_dp
    print *, "Total vascular resistance (Pin-Pout)/Flow (Pa.s/mm**3) = ",resistance
 
    !mean, min, max and std of branch diameter by Strahler order
@@ -583,6 +586,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
    std_terminal_flow = SQRT(std_terminal_flow)
    cof_var_terminal_flow = std_terminal_flow/mean_terminal_flow
    print *, "Coefficient of variation for terminal flow (%) = ", cof_var_terminal_flow * 100
+   print *, "Mean terminal flow (mm3/s) = ",mean_terminal_flow
+   print *, "Standard deviation of terminal flow (mm3/s) = ",std_terminal_flow
 
    !terminal flow by generation
    generations(:) = elem_ordrs(no_gen, :)
@@ -623,8 +628,121 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
 	 print *,order,",0,0,0,0,0" 
       endif 
    
-   enddo 
+   enddo
 
+   !if more than one inlet
+   if(count(umbilical_inlets.NE.0).GT.1)then
+
+      !print pressure and flow at each inlet
+      do inlet_counter=1,2
+         inlet_elem = umbilical_inlets(inlet_counter)
+         if(inlet_elem.GT.0)then
+            inlet_flow = elem_field(ne_Qdot,inlet_elem)
+            print *, "Flow at inlet element number ",inlet_elem, "(mm3/s) =",inlet_flow
+	    print *, "Flow at inlet element number ",inlet_elem, "(ml/min) =",inlet_flow * 0.06_dp
+            !get the first node
+            np1 = elem_nodes(1,inlet_elem)
+            inlet_pressure = node_field(nj_bv_press,np1)
+  	    print *, "Pressure at inlet node",np1,"inlet element",inlet_elem,"(Pa) =", inlet_pressure
+	    print *, "Pressure at inlet node",np1,"inlet element",inlet_elem,"(mmHg) =", inlet_pressure/133.322_dp	    
+         endif   
+      enddo
+
+      !print number of terminal units under each inlet
+      do inlet_counter=1,2
+         inlet_elem = umbilical_inlets(inlet_counter)
+	 print *, "Number of terminal units below inlet element",inlet_elem, "=",elem_units_below(inlet_elem)
+      enddo
+
+      elems_under_inlet1 = .FALSE.
+      elems_under_inlet2 = .FALSE.
+      !populate arrays of arterial elements under each inlet
+      !elements directly downstream of the inlets
+      do inlet_counter=1,2
+         inlet_elem = umbilical_inlets(inlet_counter)
+	 do n=1,elem_cnct_no_anast(1,0,inlet_elem)
+            if(inlet_counter.EQ.1)then     
+               elems_under_inlet1(elem_cnct_no_anast(1,n,inlet_elem)) = .TRUE.
+            else
+               elems_under_inlet2(elem_cnct_no_anast(1,n,inlet_elem)) = .TRUE.
+            endif
+         enddo
+      enddo
+      do ne=1,num_arterial_elems   
+         if(ALL(umbilical_inlets.NE.ne))then
+            !check which inlet the upstream elements are under and assign this element to the same inlet
+            do n=1,elem_cnct_no_anast(-1,0,ne)
+               if(elems_under_inlet1(elem_cnct_no_anast(-1,n,ne)))then
+	          elems_under_inlet1(ne) = .TRUE.
+               elseif(elems_under_inlet2(elem_cnct_no_anast(-1,n,ne)))then
+                  elems_under_inlet2(ne) = .TRUE.
+               endif
+            enddo
+         endif
+      enddo
+      !print arterial volume fed by each inlet
+      !volume under the first inlet
+      volume_fed_by_inlet = 0.0_dp
+      do ne=1,num_arterial_elems
+         if(elems_under_inlet1(ne))then
+            volume_fed_by_inlet = volume_fed_by_inlet + elem_field(ne_vol,ne)
+         endif
+      enddo
+      print *,"Arterial volume fed by inlet element",umbilical_inlets(1),"(cm3) =",volume_fed_by_inlet/1000
+      volume_fed_by_inlet = 0.0_dp
+      do ne=1,num_arterial_elems
+         if(elems_under_inlet2(ne))then
+            volume_fed_by_inlet = volume_fed_by_inlet + elem_field(ne_vol,ne)
+         endif
+      enddo
+      print *,"Arterial volume fed by inlet element",umbilical_inlets(2),"(cm3) =",volume_fed_by_inlet/1000  
+         
+      !coefficient of variation of terminal flow under each inlet
+      !standard deviation and mean flow under each inlet
+      mean_terminal_flow1 = 0
+      mean_terminal_flow2 = 0
+      num_units1 = 0
+      do nu=1,num_units
+         ne = units(nu)
+         if(elems_under_inlet1(ne))then
+            mean_terminal_flow1 = mean_terminal_flow1 + elem_field(ne_Qdot,ne)
+            num_units1 = num_units1 + 1
+         elseif(elems_under_inlet2(ne))then
+            mean_terminal_flow2 = mean_terminal_flow2 + elem_field(ne_Qdot,ne)
+         endif
+      enddo
+      mean_terminal_flow1 = mean_terminal_flow1/num_units1
+      mean_terminal_flow2 = mean_terminal_flow2/(num_units - num_units1)
+
+      std_terminal_flow1 = 0
+      std_terminal_flow2 = 0
+      do nu=1,num_units
+         ne = units(nu)
+         if(elems_under_inlet1(ne))then
+            std_terminal_flow1 = std_terminal_flow1 + (elem_field(ne_Qdot,ne) - mean_terminal_flow1)**2
+         elseif(elems_under_inlet2(ne))then
+            std_terminal_flow2 = std_terminal_flow2 + (elem_field(ne_Qdot,ne) - mean_terminal_flow2)**2
+         endif
+      enddo
+      std_terminal_flow1 = std_terminal_flow1/num_units1
+      std_terminal_flow1 = SQRT(std_terminal_flow1)
+      cof_var_terminal_flow = std_terminal_flow1/mean_terminal_flow1
+      print *, "Coefficient of variation for terminal flow (%) under inlet element", &
+                              umbilical_inlets(1),"=",cof_var_terminal_flow * 100
+      print *, "Mean terminal flow (mm3/s) under inlet element",umbilical_inlets(1),"=",mean_terminal_flow1
+      print *, "Standard deviation of terminal flow (mm3/s) under inlet element",umbilical_inlets(1),"=",&
+              std_terminal_flow1
+
+      std_terminal_flow2 = std_terminal_flow2/(num_units - num_units1)
+      std_terminal_flow2 = SQRT(std_terminal_flow2)
+      cof_var_terminal_flow = std_terminal_flow2/mean_terminal_flow2
+      print *, "Coefficient of variation for terminal flow (%) under inlet element", &
+                              umbilical_inlets(2),"=",cof_var_terminal_flow * 100
+      print *, "Mean terminal flow (mm3/s) under inlet element",umbilical_inlets(2),"=",mean_terminal_flow2
+      print *, "Standard deviation of terminal flow (mm3/s) under inlet element",umbilical_inlets(2),"=",&
+                std_terminal_flow2
+
+   endif
 
    call enter_exit(sub_name,2)
 

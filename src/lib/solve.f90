@@ -326,7 +326,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 
     call ilu_cr ( n, nz_num, ia, ja, a, ua, l )
 
-    if (diagnostics_level.GT.0) then
+    if (diagnostics_level.GT.1) then
        write ( *, '(a)' ) ' '
        write ( *, '(a)' ) 'PMGMRES_ILU_CR'
        write ( *, '(a,i4)' ) '  Number of unknowns = ', n
@@ -343,7 +343,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 
        rho = sqrt ( dot_product ( r, r ) )
 
-       if (diagnostics_level.GT.0) then
+       if (diagnostics_level.GT.1) then
           write ( *, '(a,i4,a,g14.6)' ) '  ITR = ', itr, '  Residual = ', rho
        end if
 
@@ -408,7 +408,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 
           itr_used = itr_used + 1
 
-          if (diagnostics_level.GT.0) then
+          if (diagnostics_level.GT.1) then
              write ( *, '(a,i4,a,g14.6)' ) '  K = ', k, '  Residual = ', rho
           end if
 
@@ -444,7 +444,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 
     end do
     
-    if (diagnostics_level.GT.0) then
+    if (diagnostics_level.GT.1) then
        write ( *, '(a)' ) ' '
        write ( *, '(a)' ) 'PMGMRES_ILU_CR:'
        write ( *, '(a,i6)' ) '  Iterations = ', itr_used
