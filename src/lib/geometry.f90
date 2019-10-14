@@ -696,7 +696,7 @@ contains
     real(dp) :: int_length,int_radius,seg_length,viscosity, &
                 seg_resistance,cap_unit_radius, cap_length, &
                 capillary_unit_vol, capillary_unit_area
-    real(dp) :: int_radius_in,int_radius_out
+    real(dp) :: int_radius_in,int_radius_out,avg_art_rad,avg_ven_rad
     real(dp),allocatable :: resistance(:)
     integer :: ne,nu,i,j,np1,np2,nc,nv
     integer :: AllocateStatus
@@ -733,10 +733,18 @@ contains
        STOP "*** Not enough memory for is_capillary_unit array ***"
     endif
 
-    ne =units(1) !Get a terminal unit
-    nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
-    nv =  elem_cnct(1,1,nc) !vein is downstream of the capillary
-    int_radius_in = (elem_field(ne_radius,ne)+elem_field(ne_radius,nv))/2.0_dp ! mm radius of inlet intermediate villous (average of artery and vein)
+    avg_art_rad = 0.0_dp
+    avg_ven_rad = 0.0_dp
+    do nu=1,num_units
+       ne =units(nu) !Get a terminal unit
+       nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+       nv =  elem_cnct(1,1,nc) !vein is downstream of the capillary
+       avg_art_rad = avg_art_rad + elem_field(ne_radius,ne)
+       avg_ven_rad = avg_ven_rad + elem_field(ne_radius,nv)
+    enddo
+    avg_art_rad = avg_art_rad/(num_units*1.0_dp)
+    avg_ven_rad = avg_ven_rad/(num_units*1.0_dp)
+    int_radius_in = (avg_art_rad+avg_ven_rad)/2.0_dp ! mm radius of inlet intermediate villous (average of artery and vein)
     int_radius_out=(0.03_dp + 0.03_dp/2.0_dp)/2.0_dp ! mm radius of mature intermediate villous (average of artery and vein)
     int_length=1.5_dp !mm Length of each intermediate villous
     cap_length=3_dp/num_convolutes !mm length of capillary convolutes
