@@ -66,23 +66,8 @@ contains
 !
 !###################################################################################
 !
-  subroutine define_anast_c(elem_number) bind(C, name="define_anast_c")
-
-    use geometry, only: define_anast
-    implicit none
-
-    integer, intent(in) :: elem_number
-#if defined _WIN32 && defined __INTEL_COMPILER
-    call so_define_anast(elem_number)
-#else
-    call define_anast(elem_number)
-#endif
-
-  end subroutine define_anast_c
-!
-!###################################################################################
-!
-  subroutine define_1d_elements_c(ELEMFILE, filename_len) bind(C, name="define_1d_elements_c")
+  subroutine define_1d_elements_c(ELEMFILE, filename_len, anastomosis_elem_in) &
+              bind(C, name="define_1d_elements_c")
 
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
@@ -91,15 +76,16 @@ contains
     implicit none
 
     integer,intent(in) :: filename_len
+    integer,intent(in) :: anastomosis_elem_in
     type(c_ptr), value, intent(in) :: ELEMFILE
     character(len=MAX_FILENAME_LEN) :: filename_f
 
     call strncpy(filename_f, ELEMFILE, filename_len)
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_define_1d_elements(filename_f)
+    call so_define_1d_elements(filename_f,anastomosis_elem_in)
 #else
-    call define_1d_elements(filename_f)
+    call define_1d_elements(filename_f,anastomosis_elem_in)
 #endif
 
   end subroutine define_1d_elements_c
@@ -190,6 +176,33 @@ contains
   end subroutine define_rad_from_geom_c
 !
 !###########################################################################
+!
+  subroutine define_ven_rad_from_art_c(FILENAME, filename_len,&
+          factor) bind(C, name="define_ven_rad_from_art_c")
+
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_FILENAME_LEN
+    use geometry, only: define_ven_rad_from_art
+    use arrays, only: dp
+    implicit none
+
+    integer,intent(in) :: filename_len
+    type(c_ptr), value, intent(in) :: FILENAME
+    real(dp),intent(in) :: factor
+    character(len=MAX_FILENAME_LEN) :: filename_f
+
+    call strncpy(filename_f, FILENAME, filename_len)
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_define_ven_rad_from_art(filename_f, factor)
+#else
+    call define_ven_rad_from_art(filename_f,factor)
+#endif
+
+    end subroutine define_ven_rad_from_art_c
+!
+!##################################################################################
 !
 !*element_connectivity_1d:*  Calculates element connectivity in 1D and stores in elelem_cnct
   subroutine element_connectivity_1d_c() bind(C, name="element_connectivity_1d_c")

@@ -268,6 +268,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 !    Input, real ( kind = 8 ) TOL_REL, a relative tolerance comparing the
 !    current residual to the initial residual.
 !
+    use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
 
     integer ( kind = 4 ) mr
@@ -306,9 +307,15 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
     real ( kind = 8 ) s(mr+1)
     integer ( kind = 4 ) ua(n)
     real ( kind = 8 ) v(n,mr+1);
-    logical, parameter :: verbose = .false. !need to change this so verbose only when diagnostics are on
     real ( kind = 8 ) y(mr+1)
 
+    integer :: diagnostics_level
+    character(len=60) :: sub_name
+
+
+    sub_name = 'pmgmres_ilu_cr'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
 
     itr_used = 0
     FLAG=0 !not converged 
@@ -319,7 +326,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 
     call ilu_cr ( n, nz_num, ia, ja, a, ua, l )
 
-    if ( verbose ) then
+    if (diagnostics_level.GT.1) then
        write ( *, '(a)' ) ' '
        write ( *, '(a)' ) 'PMGMRES_ILU_CR'
        write ( *, '(a,i4)' ) '  Number of unknowns = ', n
@@ -336,7 +343,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 
        rho = sqrt ( dot_product ( r, r ) )
 
-       if ( verbose ) then
+       if (diagnostics_level.GT.1) then
           write ( *, '(a,i4,a,g14.6)' ) '  ITR = ', itr, '  Residual = ', rho
        end if
 
@@ -401,7 +408,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 
           itr_used = itr_used + 1
 
-          if ( verbose ) then
+          if (diagnostics_level.GT.1) then
              write ( *, '(a,i4,a,g14.6)' ) '  K = ', k, '  Residual = ', rho
           end if
 
@@ -437,14 +444,14 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
 
     end do
     
-
-
-    if ( verbose ) then
+    if (diagnostics_level.GT.1) then
        write ( *, '(a)' ) ' '
        write ( *, '(a)' ) 'PMGMRES_ILU_CR:'
        write ( *, '(a,i6)' ) '  Iterations = ', itr_used
        write ( *, '(a,g14.6)' ) '  Final residual = ', rho
     end if
+
+    call enter_exit(sub_name,2)
 
     return
 end subroutine pmgmres_ilu_cr

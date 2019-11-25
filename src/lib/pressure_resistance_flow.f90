@@ -73,7 +73,7 @@ endif
     !pressure (at inlet and outlets)
     !flow (flow at inlet pressure at outlet).
 
-if((bc_type.NE.'pressure').AND.(bc_type.NE.'flow').AND.(bc_type.NE.'multi_inlet_pressure'))then
+if((bc_type.NE.'pressure').AND.(bc_type.NE.'flow'))then
 	print *,"unsupported bc_type",bc_type
 	call exit(1)
 elseif((bc_type.EQ.'flow').AND.(inlet_flow.EQ.0))then
@@ -86,7 +86,7 @@ if(diagnostics_level.GT.1)then
 	print *, "bc_type=",bc_type
 endif
 
-if(bc_type.eq.'pressure'.or.bc_type.eq.'multi_inlet_pressure')then
+if(bc_type.eq.'pressure')then
     if(inlet_pressure.EQ.0)then
       inletbc=6650.0_dp! Pa (50mmHg) default inlet pressure for human umbilical artery
                        !1 mmHg = 133.322 pascals (Pa)
@@ -144,7 +144,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
 
 !! Calculate resistance of each element
     call calculate_resistance(viscosity,mesh_type)
-
+        
 !! Calculate sparsity structure for solution matrices
     !Determine size of and allocate solution vectors/matrices
     call calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
@@ -162,8 +162,8 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
     !calculate the sparsity structure
 	call calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem, &
         depvar_at_node,NonZeros,MatrixSize,SparseCol,SparseRow,SparseVal,RHS, &
-        prq_solution)
-    !if(bc_type.ne.'multi_inlet_pressure')then
+        prq_solution)    
+ 
  !!! Initialise solution vector based on bcs and rigid vessel resistance
    call tree_resistance(total_resistance)
    if(diagnostics_level.GE.2)then
@@ -196,10 +196,9 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
 		   prq_solution(depvar)=solver_solution(no) !pressure & flow solutions
        endif
    enddo
-     !endif !Alys temp trying to set bcs
+    
 !need to write solution to element/nodal fields for export
     call map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_dof)
-
     !NEED TO UPDATE TERMINAL SOLUTION HERE. LOOP THO' UNITS AND TAKE FLOW AND PRESSURE AT TERMINALS
     call map_flow_to_terminals
 
@@ -250,12 +249,12 @@ depvar_at_elem,prq_solution,mesh_dof,mesh_type)
      do ne=1,num_elems
         !ne=elems(noelem)
         if (elem_cnct(-1,0,ne) == 0) THEN !Entry element
-           if(bc_type.eq.'pressure'.or.bc_type.eq.'multi_inlet_pressure')THEN
+           if(BC_TYPE == 'pressure')THEN          
               np=elem_nodes(1,ne)
               ny1=depvar_at_node(np,1,1) !for fixed pressure BC
               FIX(ny1)=.TRUE. !set fixed
               prq_solution(ny1)=inletbc !Putting BC value into solution array
-           else if(bc_type.eq.'flow')THEN
+           else if(BC_TYPE == 'flow')THEN
               ny1=depvar_at_elem(0,1,ne) !fixed
               FIX(ny1)=.TRUE. !set fixed
               prq_solution(ny1)=inletbc !Putting BC value into solution array
@@ -324,7 +323,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
 !
 !##################################################################
 !
-subroutine calculate_stats()
+subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
 !*Descripton:* This subroutine prints the following statistics for the
 ! feto-placental circulation model:
 ! arterial, venous, capillary and total vascular volume
@@ -335,33 +334,46 @@ subroutine calculate_stats()
 ! mean, min, max and standard deviation of venous branch diameter by Strahler order
 ! coefficient of variation for terminal flow
 ! terminal flow by generation
+!
+! Input parameters: FLOW_GEN_FILE - filename to export terminal blood flow statistics
+!                                   by generation
+!                   image_voxel_size in mm - this is used to calculate the volume 
+!                                   of vessels in the reconstructed tree that can't be
+!                                   resolved in the images 
+
     use indices
     use arrays,only: num_arterial_elems,dp,num_elems, &
                   elem_field,num_units,units,elem_cnct,elem_ordrs, &
                   num_conv,num_conv_gen,cap_resistance,terminal_resistance, &
-                  terminal_length,total_vasc_resistance, &
-                  cap_radius
-    use other_consts, only: PI
+                  terminal_length, is_capillary_unit,elem_cnct_no_anast, &
+                  total_cap_volume,total_cap_surface_area, umbilical_inlets, &
+                  umbilical_outlets,elem_nodes,node_field,elem_units_below
+    use other_consts, only: PI,MAX_FILENAME_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
   
+    character(len=MAX_FILENAME_LEN), intent(in) :: FLOW_GEN_FILE
+    real(dp), intent(in) :: image_voxel_size
   !local variables
     integer :: ne,nu,nc,order,max_strahler,no_branches, &
-               ne_order,branch,ven_elems,max_gen
-    real(dp) :: arterial_vasc_volume, total_vasc_volume, capillary_volume, &
-                venous_vasc_volume, single_cap_surface_area, total_cap_surface_area, &
+               ne_order,branch,ven_elems,max_gen,np1,np2, &
+               inlet_counter,inlet_elem,outlet_elem,n,num_units1
+    real(dp) :: arterial_vasc_volume, total_vasc_volume, venous_vasc_volume, &
                 mean_diameter,std_diameter,total_resistance,std_terminal_flow, &
                 cof_var_terminal_flow,mean_terminal_flow,small_vessel_volume, diameter, &
-                image_voxel_size,single_capillary_volume, cap_length
+                cap_length,cof_var_cap_flow,inlet_flow,inlet_pressure,outlet_pressure, &
+                resistance,volume_fed_by_inlet,mean_terminal_flow1,mean_terminal_flow2,&
+                std_terminal_flow1,std_terminal_flow2
     integer :: strahler_orders(num_elems)
     integer :: generations(num_elems)
-    integer :: capillaries(num_units)
     real(dp),allocatable :: diameter_by_strahler(:,:)
     real(dp),allocatable :: art_diameter_by_strahler(:,:)
     real(dp),allocatable :: ven_diameter_by_strahler(:,:)
     real(dp),allocatable :: terminal_flow_by_gen(:,:)
     integer,allocatable :: branch_count(:)
     integer,allocatable :: gen_branch_count(:)
+    logical :: elems_under_inlet1(num_arterial_elems)
+    logical :: elems_under_inlet2(num_arterial_elems)
     character(len=60) :: sub_name
     integer :: diagnostics_level
 
@@ -369,8 +381,6 @@ subroutine calculate_stats()
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
 
-
-    image_voxel_size = 0.1165 !mm
 
   !calculate arterial vascular volume
    arterial_vasc_volume = 0
@@ -380,51 +390,86 @@ subroutine calculate_stats()
    print *, "Arterial elems count",num_arterial_elems
    print *, "Arterial vascular volume (cm**3) = ",arterial_vasc_volume/1000
 
-   capillary_volume = 0
-   cap_length=3_dp
-   single_capillary_volume = PI * cap_radius**2 * cap_length 
-   !single capillary volume * number of branching generations * number of terminal units
-   capillary_volume = single_capillary_volume * num_conv_gen * num_units
- 
    print *, "Capillary unit count =",num_units
-   print *, "Capillary volume (cm**3) = ",capillary_volume/1000
-
-   !calculate capillary unit surface area
-
-   !surface area = 2*PI*radius*length
-   single_cap_surface_area = 2 * PI * cap_radius * cap_length
-   !single capillary surface area * number of branching generations * number of terminal units
-   total_cap_surface_area = single_cap_surface_area * num_conv_gen * num_units     
-   print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area/100    
+   print *, "Capillary volume (cm**3) = ",total_cap_volume
+   print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area    
 
    total_vasc_volume = 0
    do ne = 1,num_elems
-      total_vasc_volume = total_vasc_volume + elem_field(ne_vol,ne)
+         if(is_capillary_unit(ne).eq.0)then
+            total_vasc_volume = total_vasc_volume + elem_field(ne_vol,ne)
+         endif   
    enddo
-   print *, "Total vascular volume (cm**3) = ",total_vasc_volume/1000
-
-   venous_vasc_volume = total_vasc_volume - arterial_vasc_volume - capillary_volume  
+   venous_vasc_volume = total_vasc_volume - arterial_vasc_volume
    print *, "Venous vascular volume (cm**3) = ",venous_vasc_volume/1000
 
-   !volume of vessels with diameter smaller than 0.1165 mm (resolution of images)
-   small_vessel_volume = 0
-   do ne = 1,num_elems
-      diameter = elem_field(ne_radius,ne) * 2
+   !add capillary volume to total vascular volume
+   total_vasc_volume = total_vasc_volume/1000 + total_cap_volume !in cm3
+   print *, "Total vascular volume (cm**3) = ",total_vasc_volume
+
+   if(image_voxel_size.GT.0)then
+      !volume of vessels with diameter smaller than image voxel size
+      small_vessel_volume = 0
+      do ne = 1,num_elems
+         !skip capillary units
+         if(is_capillary_unit(ne).eq.0)then
+            diameter = elem_field(ne_radius,ne) * 2
+            if(diameter.LT.image_voxel_size)then
+               small_vessel_volume = small_vessel_volume + elem_field(ne_vol,ne)
+            endif
+         endif
+      enddo
+      small_vessel_volume = small_vessel_volume/1000 !convert to cm**3
+      !add all capillary_units
+      ne =units(1) !Get a terminal unit
+      nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+      diameter = elem_field(ne_radius,nc) * 2 !diameter of capillary units
       if(diameter.LT.image_voxel_size)then
-         small_vessel_volume = small_vessel_volume + elem_field(ne_vol,ne)
+         small_vessel_volume = small_vessel_volume + total_cap_volume
       endif
-   enddo
-   print *, "Volume of vessels with diameter smaller than 0.1165 mm (cm**3) = ",small_vessel_volume/1000
+      print *, "Volume of vessels with diameter smaller than ",image_voxel_size, &
+              " mm (cm**3) = ",small_vessel_volume
+   endif
 
    !Print capillary convolute number, generations and total length of capillaries
    print *, "Number of capillary convolutes per generation = ",num_conv
    print *, "Number of capillary generations per terminal unit = ",num_conv_gen
-   print *, "Resistance of capillary conduits (Pa.s/mm**3)=",cap_resistance
-   print *, "Resistance of all generations of capillaries per terminal unit (Pa.s/mm**3)=",terminal_resistance
-   print *, "Effective length of each terminal unit (mm)",terminal_length
+   print *, "Resistance of capillary conduits (Pa.s/mm**3) =",cap_resistance
+   print *, "Resistance of all generations of capillaries per terminal unit (Pa.s/mm**3) =",terminal_resistance
+   print *, "Effective length of each terminal unit (mm) =",terminal_length
 
-   !total vascular resistance
-   print *, "Total vascular resistance (Pa.s/mm**3) = ",total_vasc_resistance
+ 
+   !calculate total vascular resistance (Pressure in - Pressure out)/Blood Flow in
+   inlet_flow = 0.0_dp
+   inlet_pressure = 0.0_dp
+   do inlet_counter=1,2
+      inlet_elem = umbilical_inlets(inlet_counter)
+      if(inlet_elem.GT.0)then
+         inlet_flow = inlet_flow + elem_field(ne_Qdot,inlet_elem)
+         !get the first node
+         np1 = elem_nodes(1,inlet_elem)
+         inlet_pressure = node_field(nj_bv_press,np1)
+      endif   
+   enddo
+
+   outlet_pressure = 0.0_dp
+   if(umbilical_outlets(1).GT.0)then
+      outlet_elem = umbilical_outlets(1)
+   else !get the first unit
+      outlet_elem = units(1)
+   endif
+   !get the second node
+   np2 = elem_nodes(2,outlet_elem)
+   outlet_pressure = node_field(nj_bv_press,np2)
+   resistance = (inlet_pressure - outlet_pressure)/inlet_flow
+
+   print *, "Inlet pressure (Pa) =", inlet_pressure
+   print *, "Inlet pressure (mmHg) = ", inlet_pressure/133.322_dp
+   print *, "Outlet pressure (Pa) =", outlet_pressure
+   print *, "Outlet pressure (mmHg) =", outlet_pressure/133.322_dp
+   print *, "Flow (sum of all inlet flows) (mm3/s) =", inlet_flow
+   print *, "Flow (sum of all inlet flows) (ml/min) =", inlet_flow * 0.06_dp
+   print *, "Total vascular resistance (Pin-Pout)/Flow (Pa.s/mm**3) = ",resistance
 
    !mean, min, max and std of branch diameter by Strahler order
 
@@ -438,10 +483,10 @@ subroutine calculate_stats()
    do ne=1,num_elems
       ne_order = strahler_orders(ne)
       if(ne_order.ge.1)then
-        no_branches = branch_count(ne_order)
-        no_branches = no_branches + 1
-        diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-        branch_count(ne_order) = no_branches
+         no_branches = branch_count(ne_order)
+         no_branches = no_branches + 1
+         diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+         branch_count(ne_order) = no_branches
       endif
    enddo
    print *, "Vessel diameter (mm) by Strahler order:"
@@ -459,7 +504,6 @@ subroutine calculate_stats()
             maxval(diameter_by_strahler(order,:)),",",std_diameter    
    enddo   
 
-
    !Arterial vessel diameter by Strahler order
    allocate(art_diameter_by_strahler(max_strahler,num_arterial_elems))
    art_diameter_by_strahler = 0
@@ -467,10 +511,10 @@ subroutine calculate_stats()
    do ne=1,num_arterial_elems
       ne_order = strahler_orders(ne)
       if(ne_order.ge.1)then
-        no_branches = branch_count(ne_order)
-        no_branches = no_branches + 1
-        art_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-        branch_count(ne_order) = no_branches
+         no_branches = branch_count(ne_order)
+         no_branches = no_branches + 1
+         art_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+         branch_count(ne_order) = no_branches
       endif
    enddo
    print *, "Arterial vessel diameter (mm) by Strahler order:"
@@ -490,14 +534,6 @@ subroutine calculate_stats()
 
    !Venous vessel diameter by Strahler order
    
-   !populate capillaries array
-   do nu=1,num_units
-      !get the element below a terminal branch - this is the capillary unit
-      ne =units(nu) !Get a terminal unit   
-      nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
-      capillaries(nu) = nc
-   enddo
-
    !all elements - arterial elements - number of capillaries (the same as number of terminal units)
    ven_elems = num_elems-num_arterial_elems-num_units 
    if (ven_elems.GT.0)then
@@ -505,14 +541,14 @@ subroutine calculate_stats()
       ven_diameter_by_strahler = 0
       branch_count = 0
       do ne=num_arterial_elems+1,num_elems
-         if(ALL(capillaries.NE.ne))then !if the element is not a capillary
+         if(is_capillary_unit(ne).eq.0)then !if the element is not a capillary
             ne_order = strahler_orders(ne)
-            if(ne_order.ge.1)then
-              no_branches = branch_count(ne_order)
-              no_branches = no_branches + 1
-              ven_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-              branch_count(ne_order) = no_branches
-            endif
+	    if(ne_order.ge.1)then
+               no_branches = branch_count(ne_order)
+               no_branches = no_branches + 1
+               ven_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+               branch_count(ne_order) = no_branches
+	    endif
          endif
       enddo
       print *, "Venous vessel diameter (mm) by Strahler order:"
@@ -532,7 +568,8 @@ subroutine calculate_stats()
 
    endif !(ven_elems.GT.0)
   
-   !coefficient of variation for terminal flow
+
+  !coefficient of variation for terminal flow
    !standard deviation of flow devided by the mean flow
    mean_terminal_flow = 0
    do nu=1,num_units
@@ -549,8 +586,9 @@ subroutine calculate_stats()
    std_terminal_flow = SQRT(std_terminal_flow)
    cof_var_terminal_flow = std_terminal_flow/mean_terminal_flow
    print *, "Coefficient of variation for terminal flow (%) = ", cof_var_terminal_flow * 100
+   print *, "Mean terminal flow (mm3/s) = ",mean_terminal_flow
+   print *, "Standard deviation of terminal flow (mm3/s) = ",std_terminal_flow
 
-  
    !terminal flow by generation
    generations(:) = elem_ordrs(no_gen, :)
    max_gen = maxval(generations)
@@ -558,6 +596,10 @@ subroutine calculate_stats()
    allocate(gen_branch_count(max_gen))
    terminal_flow_by_gen = 0
    gen_branch_count = 0
+
+   !print all terminal flows and their corresponding generations to a file 
+   open(10, file=FLOW_GEN_FILE, status="replace")
+   write(10,*) 'terminal_blood_flow,generation'
    do nu=1,num_units
       ne = units(nu)  
       ne_order = generations(ne)
@@ -565,7 +607,9 @@ subroutine calculate_stats()
       no_branches = no_branches + 1
       terminal_flow_by_gen(ne_order,no_branches) = elem_field(ne_Qdot,ne)
       gen_branch_count(ne_order) = no_branches
+      write(10,*) elem_field(ne_Qdot,ne),',',ne_order
    enddo
+   close(10)
    print *, "Terminal flow (mm**3/s) by generation:"
    print *, "Generation,number_of_terminal_units,mean_flow,min_flow,max_flow,std"
    do order=1, max_gen
@@ -584,7 +628,121 @@ subroutine calculate_stats()
 	 print *,order,",0,0,0,0,0" 
       endif 
    
-   enddo 
+   enddo
+
+   !if more than one inlet
+   if(count(umbilical_inlets.NE.0).GT.1)then
+
+      !print pressure and flow at each inlet
+      do inlet_counter=1,2
+         inlet_elem = umbilical_inlets(inlet_counter)
+         if(inlet_elem.GT.0)then
+            inlet_flow = elem_field(ne_Qdot,inlet_elem)
+            print *, "Flow at inlet element number ",inlet_elem, "(mm3/s) =",inlet_flow
+	    print *, "Flow at inlet element number ",inlet_elem, "(ml/min) =",inlet_flow * 0.06_dp
+            !get the first node
+            np1 = elem_nodes(1,inlet_elem)
+            inlet_pressure = node_field(nj_bv_press,np1)
+  	    print *, "Pressure at inlet node",np1,"inlet element",inlet_elem,"(Pa) =", inlet_pressure
+	    print *, "Pressure at inlet node",np1,"inlet element",inlet_elem,"(mmHg) =", inlet_pressure/133.322_dp	    
+         endif   
+      enddo
+
+      !print number of terminal units under each inlet
+      do inlet_counter=1,2
+         inlet_elem = umbilical_inlets(inlet_counter)
+	 print *, "Number of terminal units below inlet element",inlet_elem, "=",elem_units_below(inlet_elem)
+      enddo
+
+      elems_under_inlet1 = .FALSE.
+      elems_under_inlet2 = .FALSE.
+      !populate arrays of arterial elements under each inlet
+      !elements directly downstream of the inlets
+      do inlet_counter=1,2
+         inlet_elem = umbilical_inlets(inlet_counter)
+	 do n=1,elem_cnct_no_anast(1,0,inlet_elem)
+            if(inlet_counter.EQ.1)then     
+               elems_under_inlet1(elem_cnct_no_anast(1,n,inlet_elem)) = .TRUE.
+            else
+               elems_under_inlet2(elem_cnct_no_anast(1,n,inlet_elem)) = .TRUE.
+            endif
+         enddo
+      enddo
+      do ne=1,num_arterial_elems   
+         if(ALL(umbilical_inlets.NE.ne))then
+            !check which inlet the upstream elements are under and assign this element to the same inlet
+            do n=1,elem_cnct_no_anast(-1,0,ne)
+               if(elems_under_inlet1(elem_cnct_no_anast(-1,n,ne)))then
+	          elems_under_inlet1(ne) = .TRUE.
+               elseif(elems_under_inlet2(elem_cnct_no_anast(-1,n,ne)))then
+                  elems_under_inlet2(ne) = .TRUE.
+               endif
+            enddo
+         endif
+      enddo
+      !print arterial volume fed by each inlet
+      !volume under the first inlet
+      volume_fed_by_inlet = 0.0_dp
+      do ne=1,num_arterial_elems
+         if(elems_under_inlet1(ne))then
+            volume_fed_by_inlet = volume_fed_by_inlet + elem_field(ne_vol,ne)
+         endif
+      enddo
+      print *,"Arterial volume fed by inlet element",umbilical_inlets(1),"(cm3) =",volume_fed_by_inlet/1000
+      volume_fed_by_inlet = 0.0_dp
+      do ne=1,num_arterial_elems
+         if(elems_under_inlet2(ne))then
+            volume_fed_by_inlet = volume_fed_by_inlet + elem_field(ne_vol,ne)
+         endif
+      enddo
+      print *,"Arterial volume fed by inlet element",umbilical_inlets(2),"(cm3) =",volume_fed_by_inlet/1000  
+         
+      !coefficient of variation of terminal flow under each inlet
+      !standard deviation and mean flow under each inlet
+      mean_terminal_flow1 = 0
+      mean_terminal_flow2 = 0
+      num_units1 = 0
+      do nu=1,num_units
+         ne = units(nu)
+         if(elems_under_inlet1(ne))then
+            mean_terminal_flow1 = mean_terminal_flow1 + elem_field(ne_Qdot,ne)
+            num_units1 = num_units1 + 1
+         elseif(elems_under_inlet2(ne))then
+            mean_terminal_flow2 = mean_terminal_flow2 + elem_field(ne_Qdot,ne)
+         endif
+      enddo
+      mean_terminal_flow1 = mean_terminal_flow1/num_units1
+      mean_terminal_flow2 = mean_terminal_flow2/(num_units - num_units1)
+
+      std_terminal_flow1 = 0
+      std_terminal_flow2 = 0
+      do nu=1,num_units
+         ne = units(nu)
+         if(elems_under_inlet1(ne))then
+            std_terminal_flow1 = std_terminal_flow1 + (elem_field(ne_Qdot,ne) - mean_terminal_flow1)**2
+         elseif(elems_under_inlet2(ne))then
+            std_terminal_flow2 = std_terminal_flow2 + (elem_field(ne_Qdot,ne) - mean_terminal_flow2)**2
+         endif
+      enddo
+      std_terminal_flow1 = std_terminal_flow1/num_units1
+      std_terminal_flow1 = SQRT(std_terminal_flow1)
+      cof_var_terminal_flow = std_terminal_flow1/mean_terminal_flow1
+      print *, "Coefficient of variation for terminal flow (%) under inlet element", &
+                              umbilical_inlets(1),"=",cof_var_terminal_flow * 100
+      print *, "Mean terminal flow (mm3/s) under inlet element",umbilical_inlets(1),"=",mean_terminal_flow1
+      print *, "Standard deviation of terminal flow (mm3/s) under inlet element",umbilical_inlets(1),"=",&
+              std_terminal_flow1
+
+      std_terminal_flow2 = std_terminal_flow2/(num_units - num_units1)
+      std_terminal_flow2 = SQRT(std_terminal_flow2)
+      cof_var_terminal_flow = std_terminal_flow2/mean_terminal_flow2
+      print *, "Coefficient of variation for terminal flow (%) under inlet element", &
+                              umbilical_inlets(2),"=",cof_var_terminal_flow * 100
+      print *, "Mean terminal flow (mm3/s) under inlet element",umbilical_inlets(2),"=",mean_terminal_flow2
+      print *, "Standard deviation of terminal flow (mm3/s) under inlet element",umbilical_inlets(2),"=",&
+                std_terminal_flow2
+
+   endif
 
    call enter_exit(sub_name,2)
 
@@ -694,34 +852,59 @@ end subroutine calc_depvar_maps
 !##################################################################
 !
 subroutine tree_resistance(resistance)
-!*Descripton:* This subroutine calculates the total resistance of a tree
+!*Descripton:* This subroutine calculates the approximate
+! total resistance of a tree so that the solution can be initialised.
+! It underestimates the resistance of venous vessels (converging tree)
+! as some are added in parallel instead of in a series
     use indices
-    use arrays,only: dp,num_elems,elem_cnct,elem_field,&
-                     total_vasc_resistance
-    use diagnostics, only: enter_exit
+    use arrays,only: dp,num_elems,elem_field,&
+                     elem_cnct,umbilical_inlets,&
+                     anastomosis_elem
+    use diagnostics, only: enter_exit,get_diagnostics_level
     character(len=60) :: sub_name
 !local variables
     real(dp), intent(out) :: resistance
     real(dp) :: invres,elem_res(num_elems)
-    integer :: num2,ne,ne2
+    integer :: num2,ne,ne2,num_connected_elems,inlet_counter,&
+               daughter_counter
+    integer :: diagnostics_level
 
     sub_name = 'tree_resistance'
     call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
 
     elem_res(1:num_elems)=elem_field(ne_resist,1:num_elems)
+
     do ne=num_elems,1,-1
-       !ne=elems(num)
-      invres=0.0_dp
-      do num2=1,elem_cnct(1,0,ne)
-         ne2=elem_cnct(1,num2,ne)
-         invres=invres+1.0_dp/elem_res(ne2)
-      enddo
-      if(elem_cnct(1,0,ne).gt.0)then 
-        elem_res(ne)=elem_res(ne)+1.0_dp/invres
+       invres=0.0_dp
+       !exclude the anastomosis element if one exists
+       if((anastomosis_elem.EQ.0).OR.(ne.NE.anastomosis_elem))then  
+          num_connected_elems = elem_cnct(1,0,ne)
+          if(num_connected_elems.GT.0)then
+             daughter_counter = 0
+             do num2=1,num_connected_elems
+                ne2=elem_cnct(1,num2,ne)
+                if((anastomosis_elem.EQ.0).OR.(ne2.NE.anastomosis_elem))then 
+                   invres=invres+1.0_dp/elem_res(ne2) !resistance in parallel, for daughter branches
+                   daughter_counter = daughter_counter + 1
+                endif   
+             enddo
+             if(daughter_counter.GT.0)then
+                elem_res(ne)=elem_res(ne)+1.0_dp/invres !resistance in a series
+             endif
+          endif
        endif
     enddo
-    resistance=elem_res(1)
-    total_vasc_resistance = resistance
+
+    !calculate total tree resistance by summing resistances at each inlet in parallel
+    resistance = 0
+    do inlet_counter=1,count(umbilical_inlets.NE.0)
+       resistance = resistance + 1.0_dp/elem_res(umbilical_inlets(inlet_counter)) !resistance in parallel
+    enddo
+    resistance = 1.0_dp/resistance
+    if(diagnostics_level.GT.0)then
+       print *,"tree resistance to initialise solution: ",resistance
+    endif
 
     call enter_exit(sub_name,2)
 end subroutine tree_resistance
@@ -805,6 +988,7 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
  	enddo
  	
  	fixed_pressures = fixed_variables - fixed_flows
+
  	!count of pressure equations = (number of elements * 3 variables in each equation) - fixed pressures - fixed flows
  	!NonZeros = num_elems*3 - fixed_pressures - fixed_flows + 3
  	NonZeros = (num_elems-fixed_pressures-fixed_flows)*3 + (fixed_pressures + fixed_flows)*2
@@ -974,16 +1158,16 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
     NodePressureDone = .FALSE.  !.TRUE. for nodes which have been processed
     ElementPressureEquationDone = .FALSE.
  	offset=0!variable position offset
-
-    do ne=1,num_elems
+	
+    do ne=1,num_elems  	  
   	  !look at pressure variables at each node
   	  do nn=1,2 !2 nodes in 1D element
-		np=elem_nodes(nn,ne)
+		np=elem_nodes(nn,ne) 
 		depvar = depvar_at_node(np,1,1)
    	  	if((.NOT.NodePressureDone(np)).AND.(.NOT.FIX(depvar)))then !check if this node is not fixed and hasn't already been processed (as nodes are shared between elements)
    	  		ne2=0
    	  		if(nn.EQ.1)then !first node of the element
-   	  			ne2=ne! use the current element
+   	  			ne2=ne! use the current element   	  		
    	  		elseif(nn.EQ.2)then !second node of the element
    	  			if((bc_type.EQ.'pressure').OR.(.NOT.ElementPressureEquationDone(ne)))then !if bc_type is pressure or element pressure equation for the current element hasn't been used
    	  				ne2=ne! use the current element
@@ -997,134 +1181,134 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
                 			if((ne3.NE.ne).AND.(.NOT.ElementPressureEquationDone(ne3)))then
                 				ne2 = ne3
                 				elem_found=.TRUE.
-                			endif
-                			noelem2 = noelem2 + 1
-   	  					end do
-   	  				endif
+                			endif  
+                			noelem2 = noelem2 + 1           	   	  					
+   	  					end do  	  				  	  				
+   	  				endif 	  			
    	  			endif
    	  		endif
-   	  		if(ne2.GT.0)then
+   	  		if(ne2.GT.0)then 
    	  			!do the pressure equation for element ne2
- 				!pressure for node 1 - pressure for node 2 - resistance * flow at element ne2 = 0
-				np1=elem_nodes(1,ne2)
+ 				!pressure for node 1 - pressure for node 2 - resistance * flow at element ne2 = 0							
+				np1=elem_nodes(1,ne2)	
 	  			depvar1=depvar_at_node(np1,1,1) !pressure variable for first node
 	  			np2=elem_nodes(2,ne2) !second node
       			depvar2=depvar_at_node(np2,1,1) !pressure variable for second node
-	  			depvar3=depvar_at_elem(0,1,ne2) !flow variable for element
+	  			depvar3=depvar_at_elem(0,1,ne2) !flow variable for element								
 				if(FIX(depvar1))then !checking if pressure at 1st node is fixed
-					!store known variable - inlet pressure
+					!store known variable - inlet pressure	
 					RHS(nzz_row) = -prq_solution(depvar1)
 				else
 					!unknown variable -pressure for node 1
 					call get_variable_offset(depvar1,mesh_dof,FIX,offset)
 					SparseCol(nzz) = depvar1 - offset !variable number
 					SparseVal(nzz)=1.0_dp !variable coefficient
-					nzz=nzz+1 !next column
-				endif
+					nzz=nzz+1 !next column	
+				endif						
 				if(FIX(depvar2))then !checking if pressure at 2nd node is fixed
-	       			!store known variable - outlet pressure
+	       			!store known variable - outlet pressure	
 					RHS(nzz_row) = prq_solution(depvar2)
 				else
 					!unknown variable - pressure for node 2
-					call get_variable_offset(depvar2,mesh_dof,FIX,offset)
+					call get_variable_offset(depvar2,mesh_dof,FIX,offset)		
 					SparseCol(nzz) = depvar2 - offset !variable number
 					SparseVal(nzz)=-1.0_dp !variable coefficient
-					nzz=nzz+1 !next column
-				endif
+					nzz=nzz+1 !next column	
+				endif				
 				if(FIX(depvar3))then !checking if flow at element ne2 is fixed
 					!store known variable - inlet flow * resistance for element	ne
-					RHS(nzz_row) = prq_solution(depvar3)*elem_field(ne_resist,ne2)
+					RHS(nzz_row) = prq_solution(depvar3)*elem_field(ne_resist,ne2)			
 				else
 					!unknown flow
-					call get_variable_offset(depvar3,mesh_dof,FIX,offset)
+					call get_variable_offset(depvar3,mesh_dof,FIX,offset)			
 					SparseCol(nzz) = depvar3-offset !variable position in the unknown variable vector
 					SparseVal(nzz)=-elem_field(ne_resist,ne2) !variable coefficient = resistance for element ne2
-					nzz=nzz+1 !next column
-				endif
+					nzz=nzz+1 !next column	 				
+				endif			
 				nzz_row=nzz_row+1 !store next row position
-	    			SparseRow(nzz_row)=nzz
+	    			SparseRow(nzz_row)=nzz  			
    	  			NodePressureDone(np) = .TRUE.
    	  			ElementPressureEquationDone(ne2) = .TRUE.
-   	  		endif
- 	  	endif
+   	  		endif	  			  
+ 	  	endif	  
   	  enddo !nn
   	  !look at flow variable for the element
 	  flow_var = depvar_at_elem(0,1,ne)
-	  if(.NOT.FIX(flow_var))then !don't do anything if flow is fixed
+	  if(.NOT.FIX(flow_var))then !don't do anything if flow is fixed	  
 	  	one_node_balanced = .FALSE.
 	  	!check if node 1 or node 2 are unbalanced
       	do nn=1,2 !do flow balance for each element node
-      	  np = elem_nodes(nn,ne)
+      	  np = elem_nodes(nn,ne)       
           if((elems_at_node(np,0).GT.1).AND.(.NOT.FlowBalancedNodes(np)))then !if there is more than one element at a node and the node is not already flow balanced
-          	if((bc_type.EQ.'pressure').OR.((bc_type.EQ.'flow').AND.(.NOT.one_node_balanced)))then !do just one flow balance equation for bc_type flow
+          	if((bc_type.EQ.'pressure').OR.((bc_type.EQ.'flow').AND.(.NOT.one_node_balanced)))then !do just one flow balance equation for bc_type flow          		
           		!go through each element connected to node np and add the conservation of flow equation for the elements
-          		do noelem2=1,elems_at_node(np,0)
-              		ne2=elems_at_node(np,noelem2)
-              		depvar=depvar_at_elem(1,1,ne2)
-              		flow_term = 0
-              		if(np.EQ.elem_nodes(2,ne2))then !end node
-              			flow_term = 1.0_dp
-              		elseif(np.EQ.elem_nodes(1,ne2))then !start node
-              			flow_term = -1.0_dp
-              		endif
-              		if(FIX(depvar))then
+          		do noelem2=1,elems_at_node(np,0)            
+              		    ne2=elems_at_node(np,noelem2)
+              		    depvar=depvar_at_elem(1,1,ne2)              
+              		    flow_term = 0
+              		    if(np.EQ.elem_nodes(2,ne2))then !end node
+              			flow_term = 1.0_dp              
+              		    elseif(np.EQ.elem_nodes(1,ne2))then !start node
+              			flow_term = -1.0_dp   
+              		    endif           
+              		    if(FIX(depvar))then           
               			RHS(nzz_row)=-prq_solution(depvar)*flow_term
-              		else
+              		    else
                 		!populate SparseCol and SparseVal
-			  			call get_variable_offset(depvar,mesh_dof,FIX,offset)
-			  			SparseCol(nzz) = depvar - offset
-              			SparseVal(nzz) = flow_term
-              			nzz = nzz + 1
-              		endif
-				enddo
+			  	call get_variable_offset(depvar,mesh_dof,FIX,offset)			
+			  	SparseCol(nzz) = depvar - offset
+              			SparseVal(nzz) = flow_term 
+              			nzz = nzz + 1             	                          
+              		    endif            
+			enddo  			
 				FlowBalancedNodes(np) = .TRUE.
 				nzz_row=nzz_row+1 !store next row position
-	    			SparseRow(nzz_row)=nzz
-	    			one_node_balanced = .TRUE.
+	    			SparseRow(nzz_row)=nzz	
+	    			one_node_balanced = .TRUE.	    		
 	    		endif !checking bc_type
  		  endif !flow at node np is unbalanced
  		enddo !nn
-
+	  	
 	  	!if flow balancing hasn't been done for any node for element ne and pressure equation hasn't already been done, do the pressure equation for the element
 	  	if((.NOT.one_node_balanced).AND.(.NOT.ElementPressureEquationDone(ne)))then
-
+	  	
   	  		!do the pressure equation for element ne
- 			!pressure for node 1 - pressure for node 2 - resistance * flow at element ne = 0
-			np1=elem_nodes(1,ne)
+ 			!pressure for node 1 - pressure for node 2 - resistance * flow at element ne = 0		
+			np1=elem_nodes(1,ne) 
 	  		depvar1=depvar_at_node(np1,1,1) !pressure variable for first node
 	  		np2=elem_nodes(2,ne) !second node
-      		depvar2=depvar_at_node(np2,1,1) !pressure variable for second node
+      		depvar2=depvar_at_node(np2,1,1) !pressure variable for second node	
 			!unknown variable -pressure for node 1
-			call get_variable_offset(depvar1,mesh_dof,FIX,offset)
+			call get_variable_offset(depvar1,mesh_dof,FIX,offset)		
 			SparseCol(nzz) = depvar1 - offset !variable number
 			SparseVal(nzz)=1.0_dp !variable coefficient
-			nzz=nzz+1 !next column
+			nzz=nzz+1 !next column	
 			if(FIX(depvar2))then !checking if pressure at 2nd node is fixed
-	       		!store known variable - outlet pressure
+	       		!store known variable - outlet pressure	
 				RHS(nzz_row) = prq_solution(depvar2)
 			else
 				!unknown variable - pressure for node 2
-				call get_variable_offset(depvar2,mesh_dof,FIX,offset)
+				call get_variable_offset(depvar2,mesh_dof,FIX,offset)		
 				SparseCol(nzz) = depvar2 - offset !variable number
 				SparseVal(nzz)=-1.0_dp !variable coefficient
-				nzz=nzz+1 !next column
+				nzz=nzz+1 !next column	
 			endif
-
+				
 			!unknown flow
-			call get_variable_offset(flow_var,mesh_dof,FIX,offset)
+			call get_variable_offset(flow_var,mesh_dof,FIX,offset)			
 			SparseCol(nzz) = flow_var-offset !variable position in the unknown variable vector
 			SparseVal(nzz)=-elem_field(ne_resist,ne) !variable coefficient = resistance for element ne
-			nzz=nzz+1 !next column
-
+			nzz=nzz+1 !next column	 				
+					
 			nzz_row=nzz_row+1 !store next row position
-	    		SparseRow(nzz_row)=nzz
-   	  		ElementPressureEquationDone(ne) = .TRUE.
-	  	endif
+	    		SparseRow(nzz_row)=nzz 			
+   	  		ElementPressureEquationDone(ne) = .TRUE.	  		  
+	  	endif	  
 	  endif
 	enddo !ne
 	if(diagnostics_level.GT.1)then
-    		print *,"MatrixSize 2=",MatrixSize,num_elems,num_nodes,nzz,nzz_row
-    		print *,"NonZeros 2=",NonZeros
+    		print *,"MatrixSize=",MatrixSize
+    		print *,"NonZeros=",NonZeros
     		do nzz=1,NonZeros
   			print *,"SparseCol(",nzz,")",SparseCol(nzz)
   		enddo
