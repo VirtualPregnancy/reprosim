@@ -19,7 +19,153 @@ module pressure_resistance_flow
   !Interfaces
   private
   public evaluate_prq, calculate_stats
+  public calc_capillary_unit_length
+
 contains
+!
+!###################################################################################
+!
+  subroutine calc_capillary_unit_length(num_convolutes,num_generations)
+  !*Description:* Calculates the effective length of a capillary unit based on its total resistance
+  ! and assumed radius, given the number of terminal convolute connections and the number of
+  ! generations of symmetric intermediate villous branches
+    use arrays,only: dp,num_units,units,elem_field,elem_direction, &
+                     node_xyz,elem_nodes,elem_cnct,num_conv,num_conv_gen, &
+                     cap_resistance,terminal_resistance,terminal_length, &
+                     cap_radius,is_capillary_unit,total_cap_volume,total_cap_surface_area, &
+                     num_elems
+    use diagnostics, only: enter_exit,get_diagnostics_level
+    use other_consts, only: PI
+    use indices, only: ne_length,ne_radius,ne_vol
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
+
+    integer, intent(inout) :: num_convolutes,num_generations
+
+    real(dp) :: int_length,int_radius,seg_length,viscosity, &
+                seg_resistance,cap_unit_radius, cap_length, &
+                capillary_unit_vol, capillary_unit_area
+    real(dp) :: int_radius_in,int_radius_out
+    real(dp),allocatable :: resistance(:)
+    integer :: ne,nu,i,j,np1,np2,nc,nv
+    integer :: AllocateStatus
+    character(len=60) :: sub_name
+    integer:: diagnostics_level
+
+    sub_name = 'calc_terminal_unit_length'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+
+    !check number of capillary convolutes and number of intermediate villous tree generations
+    if (num_convolutes.LE.0)then
+      num_convolutes = 6
+    endif
+    if (num_generations.LE.0)then
+      num_generations = 3
+    endif
+
+    num_conv = num_convolutes
+    num_conv_gen = num_generations
+
+    if (diagnostics_level.GE.2)then
+      print *, "num_convolutes=",num_convolutes
+      print *, "num_generations=",num_generations
+    endif
+
+    allocate (resistance(num_convolutes+1), STAT = AllocateStatus)
+    if (AllocateStatus /= 0)then
+       STOP "*** Not enough memory for resistance array ***"
+    endif
+
+    allocate(is_capillary_unit(num_elems), STAT = AllocateStatus)
+    if (AllocateStatus /= 0)then
+       STOP "*** Not enough memory for is_capillary_unit array ***"
+    endif
+
+    ne =units(1) !Get a terminal unit
+    nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+    nv =  elem_cnct(1,1,nc) !vein is downstream of the capillary
+    int_radius_in = (elem_field(ne_radius,ne)+elem_field(ne_radius,nv))/2.0_dp ! mm radius of inlet intermediate villous (average of artery and vein)
+    int_radius_out=(0.03_dp + 0.03_dp/2.0_dp)/2.0_dp ! mm radius of mature intermediate villous (average of artery and vein)
+    int_length=1.5_dp !mm Length of each intermediate villous
+    cap_length=3_dp/num_convolutes !mm length of capillary convolutes
+    cap_radius=0.0144_dp/2.0_dp !radius of capillary convolutes
+    seg_length=int_length/num_convolutes !lengh of each intermediate villous segment
+    viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
+    cap_unit_radius = 0.03_dp
+    cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
+    terminal_resistance = 0
+
+    !calculate total capillary unit volume and surface area so that this can be used by subroutine calculate_stats
+    !in module pressure_resistance_flow
+    capillary_unit_vol = PI * cap_radius**2 * cap_length * num_convolutes * num_generations
+    capillary_unit_area = 2 * PI * cap_radius * cap_length * num_convolutes * num_generations
+
+    do j=1,num_generations
+
+      int_radius = int_radius_in - (int_radius_in-int_radius_out)/num_generations*j
+
+      !capillary unit volume and surface area calculation - adding intermediate villous volume
+      !and area for the generation
+      capillary_unit_vol = capillary_unit_vol + PI * int_radius**2 * int_length
+      capillary_unit_area = capillary_unit_area + 2 * PI * int_radius * int_length
+
+      seg_resistance=(8.d0*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
+      !calculate total resistance of terminal capillary conduits
+      i=1
+      resistance(i)= cap_resistance + 2.d0*seg_resistance
+      do i=2,num_convolutes
+        resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1))
+      enddo
+      cap_resistance = resistance(num_convolutes) !Pa . s per mm^3 total resistance of terminal capillary conduits
+
+      !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
+      !of the system by summing the resistance of each generation
+
+      terminal_resistance = terminal_resistance + cap_resistance/2**j
+    enddo
+
+    terminal_length = terminal_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
+
+    total_cap_volume = capillary_unit_vol * num_units/1000 !in cm**3
+    total_cap_surface_area = capillary_unit_area * num_units/100 !in cm**2
+
+    if(diagnostics_level.GE.2)then
+      print *, "Resistance of capillary conduits=",cap_resistance
+      print *, "Resistance of all generations of capillaries per terminal unit=",terminal_resistance
+      print *, "Effective length of each capillary unit (mm)",terminal_length
+      print *, "Total capillary length for the vasculature (cm)",(terminal_length*num_units)/10
+      print *, "Total capillary volume (cm**3) = ",total_cap_volume
+      print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area
+    endif
+
+    is_capillary_unit = 0
+    !set the effective length of each capillary unit based the total resistance of capillary convolutes
+    do nu=1,num_units
+      ne =units(nu) !Get a terminal unit
+      nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+      is_capillary_unit(nc) = 1
+      !update element radius
+      elem_field(ne_radius,nc) = cap_unit_radius
+      !update element length
+      elem_field(ne_length,nc) = terminal_length
+      !update element direction
+      np1=elem_nodes(1,nc)
+      np2=elem_nodes(2,nc)
+      do j=1,3
+        elem_direction(j,nc) = (node_xyz(j,np2) - &
+               node_xyz(j,np1))/elem_field(ne_length,nc)
+      enddo
+
+      !update element volume
+      elem_field(ne_vol,nc) = PI * elem_field(ne_radius,nc)**2 * &
+            elem_field(ne_length,nc)
+
+    enddo
+
+    call enter_exit(sub_name,2)
+
+  end subroutine calc_capillary_unit_length
 !###################################################################################
 !
 subroutine evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_pressure)

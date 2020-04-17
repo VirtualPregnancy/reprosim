@@ -5,7 +5,6 @@
 
 extern void add_matching_mesh_c(const char *umbilical_elem_option, int *umbilical_elem_option_len, int umbilical_element_numbers[], int *umbilical_element_numbers_len);
 void append_units_c();
-void calc_capillary_unit_length_c(int *num_convolutes, int *num_generations);
 void define_1d_elements_c(const char *ELEMFILE, int *filename_len, int *anastomosis_elem_in);
 void define_node_geometry_c(const char *NODEFILE, int *filename_len);
 void define_rad_from_file_c(const char *FIELDFILE, int *filename_len, const char *order_system, 
@@ -30,10 +29,6 @@ void append_units()
   append_units_c();
 }
 
-void calc_capillary_unit_length(int num_convolutes, int num_generations)
-{
-  calc_capillary_unit_length_c(&num_convolutes,&num_generations);
-}
 
 void define_1d_elements(const char *ELEMFILE,int anastomosis_elem_in)
 {

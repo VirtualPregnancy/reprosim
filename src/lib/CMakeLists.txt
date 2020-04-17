@@ -6,11 +6,11 @@ set(LIB_SRCS
   exports.f90
   geometry.f90
   indices.f90
+  nutrient_transport.f90
   math_utilities.f90
   other_consts.f90
   pressure_resistance_flow.f90
   solve.f90
-
 )
 
 set(REPROSIM_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Modules")

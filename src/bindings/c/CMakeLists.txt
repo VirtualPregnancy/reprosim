@@ -7,6 +7,7 @@ set(C_FORTRAN_LIB_SRCS
     exports.f90
     geometry.f90
     indices.f90
+    nutrient_transport.f90
     pressure_resistance_flow.f90
     utils.f90
 )
@@ -16,6 +17,7 @@ set(C_C_LIB_SRCS
     exports.c
     geometry.c
     indices.c
+    nutrient_transport.c
     pressure_resistance_flow.c
     utils.c
 )
@@ -27,6 +29,7 @@ set(C_LIB_HDRS
   exports.h
   geometry.h
   indices.h
+  nutrient_transport.h
   pressure_resistance_flow.h
   utils.h
 

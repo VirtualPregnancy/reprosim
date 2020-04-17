@@ -48,24 +48,6 @@ contains
 !
 !###################################################################################
 !
-!*calc_capillary_unit_length:* Calculates the effective length of terminal units
-  subroutine calc_capillary_unit_length_c(num_convolutes,num_generations) &
-      bind(C, name="calc_capillary_unit_length_c")
-    use geometry, only: calc_capillary_unit_length
-    implicit none
-
-    integer, intent(inout) :: num_convolutes,num_generations
-
-#if defined _WIN32 && defined __INTEL_COMPILER
-    call so_calc_capillary_unit_length(num_convolutes,num_generations)
-#else
-    call calc_capillary_unit_length(num_convolutes,num_generations)
-#endif
-
-  end subroutine calc_capillary_unit_length_c
-!
-!###################################################################################
-!
   subroutine define_1d_elements_c(ELEMFILE, filename_len, anastomosis_elem_in) &
               bind(C, name="define_1d_elements_c")
 

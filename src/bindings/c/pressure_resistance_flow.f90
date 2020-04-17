@@ -32,10 +32,25 @@ contains
 
   end subroutine calculate_stats_c
 
+
 !
 !###################################################################################
 !
+!*calc_capillary_unit_length:* Calculates the effective length of terminal units
+  subroutine calc_capillary_unit_length_c(num_convolutes,num_generations) &
+      bind(C, name="calc_capillary_unit_length_c")
+    use pressure_resistance_flow, only: calc_capillary_unit_length
+    implicit none
 
+    integer, intent(inout) :: num_convolutes,num_generations
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_calc_capillary_unit_length(num_convolutes,num_generations)
+#else
+    call calc_capillary_unit_length(num_convolutes,num_generations)
+#endif
+
+  end subroutine calc_capillary_unit_length_c
 
 !!!###################################################################################
 

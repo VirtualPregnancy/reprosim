@@ -2,6 +2,7 @@
 #include "string.h"
 
 void calculate_stats_c(const char *FLOW_GEN_FILE, int *filename_len, double *image_voxel_size);
+void calc_capillary_unit_length_c(int *num_convolutes, int *num_generations);
 void evaluate_prq_c(const char *mesh_type, int *mesh_type_len, const char *bc_type, int *bc_type_len, double *inlet_flow, double *inlet_pressure, double *outlet_pressure);
 
 
@@ -9,6 +10,11 @@ void calculate_stats(const char *FLOW_GEN_FILE, double image_voxel_size)
 {
    int filename_len = strlen(FLOW_GEN_FILE);
    calculate_stats_c(FLOW_GEN_FILE, &filename_len, &image_voxel_size);
+}
+
+void calc_capillary_unit_length(int num_convolutes, int num_generations)
+{
+  calc_capillary_unit_length_c(&num_convolutes,&num_generations);
 }
 
 void evaluate_prq(const char *mesh_type, const char *bc_type, double inlet_flow,double inlet_pressure, double outlet_pressure)
