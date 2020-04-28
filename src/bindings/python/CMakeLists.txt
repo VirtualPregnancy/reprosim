@@ -1,7 +1,6 @@
 
 project(ReprosimPythonBindings LANGUAGES C)
 
-find_package(NumPy REQUIRED)
 
 set(ADDITIONAL_GENERATED_FILES)
 # SWIG has already been found at this point.
