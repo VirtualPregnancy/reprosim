@@ -14,10 +14,10 @@ endif()
 set(INTERFACE_SRCS
   ../interface/arrays.i
   ../interface/diagnostics.i
-  ../interface/exports.i
   ../interface/geometry.i
   ../interface/indices.i
   ../interface/pressure_resistance_flow.i
+  ../interface/repro_exports.i
 
 )
 
