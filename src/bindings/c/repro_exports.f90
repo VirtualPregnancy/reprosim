@@ -1,4 +1,4 @@
-module exports_c
+module repro_exports_c
   implicit none
 
   private
@@ -11,7 +11,7 @@ contains
 
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
-    use exports, only: export_1d_elem_field
+    use repro_exports, only: export_1d_elem_field
     use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
     implicit none
     integer,intent(in) :: ne_field, filename_len, group_name_len, field_name_len
@@ -37,7 +37,7 @@ contains
 
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
-    use exports, only: export_1d_elem_geometry
+    use repro_exports, only: export_1d_elem_geometry
     use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
     implicit none
     integer,intent(in) :: filename_len, name_len
@@ -64,7 +64,7 @@ contains
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
     use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
-    use exports, only: export_node_geometry
+    use repro_exports, only: export_node_geometry
     implicit none
 
     integer,intent(in) :: filename_len, name_len
@@ -89,7 +89,7 @@ contains
 
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
-    use exports, only: export_terminal_perfusion
+    use repro_exports, only: export_terminal_perfusion
     use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
     implicit none
     integer,intent(in) :: filename_len, name_len
@@ -116,7 +116,7 @@ contains
 
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
-    use exports, only: export_node_field
+    use repro_exports, only: export_node_field
     use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
     implicit none
     integer,intent(in) :: nj_field, filename_len, name_len, field_name_len
@@ -136,4 +136,4 @@ contains
 
   end subroutine export_node_field_c
 
-end module exports_c
+end module repro_exports_c

@@ -3,12 +3,12 @@
 set(LIB_SRCS
   arrays.f90
   diagnostics.f90
-  exports.f90
   geometry.f90
   indices.f90
   math_utilities.f90
   other_consts.f90
   pressure_resistance_flow.f90
+  repro_exports.f90
   solve.f90
 
 )

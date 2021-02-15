@@ -4,19 +4,19 @@ project(ReprosimCBindings LANGUAGES C Fortran)
 set(C_FORTRAN_LIB_SRCS
     arrays.f90
     diagnostics.f90
-    exports.f90
     geometry.f90
     indices.f90
     pressure_resistance_flow.f90
+    repro_exports.f90
     utils.f90
 )
 set(C_C_LIB_SRCS
     arrays.c
     diagnostics.c
-    exports.c
     geometry.c
     indices.c
     pressure_resistance_flow.c
+    repro_exports.c
     utils.c
 )
 
@@ -24,10 +24,10 @@ set(C_LIB_HDRS
   symbol_export.h
   arrays.h
   diagnostics.h
-  exports.h
   geometry.h
   indices.h
   pressure_resistance_flow.h
+  repro_exports.h
   utils.h
 
 )
