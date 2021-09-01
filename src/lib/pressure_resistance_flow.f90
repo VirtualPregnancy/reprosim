@@ -22,8 +22,8 @@ module pressure_resistance_flow
 contains
 !###################################################################################
 !
-subroutine evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_pressure)
-!*Description:* Solves for pressure and flow in a rigid or compliant tree structure  
+subroutine evaluate_prq(mesh_type,bc_type,rheology_type,vessel_type,inlet_flow,inlet_pressure,outlet_pressure)
+!*Description:* Solves for pressure and flow in a rigid or compliant tree structure
 ! Model Types:                                                                     
 ! mesh_type: can be 'simple_tree' or 'full_plus_tube'. Simple_tree is the input arterial tree 
 ! without any special features at the terminal level
@@ -37,7 +37,7 @@ subroutine evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_press
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_PRQ" :: EVALUATE_PRQ
   
-    character(len=60), intent(in) :: mesh_type,bc_type
+    character(len=60), intent(in) :: mesh_type,bc_type,rheology_type,vessel_type
     real(dp), intent(in) :: inlet_flow,inlet_pressure,outlet_pressure
     
     !local variables

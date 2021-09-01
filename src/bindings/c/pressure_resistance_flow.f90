@@ -39,8 +39,9 @@ contains
 
 !!!###################################################################################
 
-subroutine evaluate_prq_c(mesh_type,mesh_type_len,bc_type,bc_type_len,inlet_flow, &
-               inlet_pressure,outlet_pressure) bind(C, name="evaluate_prq_c")
+subroutine evaluate_prq_c(mesh_type,mesh_type_len,bc_type,bc_type_len,rheology_type, &
+                rheology_type_len,vessel_type,vessel_type_len,inlet_flow, &
+                inlet_pressure,outlet_pressure) bind(C, name="evaluate_prq_c")
 
 use iso_c_binding, only: c_ptr
 use utils_c, only: strncpy
@@ -49,18 +50,18 @@ use arrays, only: dp
 use pressure_resistance_flow, only: evaluate_prq
 implicit none
 
-type(c_ptr), value, intent(in) :: mesh_type,bc_type
-integer,intent(in) :: mesh_type_len,bc_type_len
-character(len=MAX_STRING_LEN) :: mesh_type_f,bc_type_f
+type(c_ptr), value, intent(in) :: mesh_type,bc_type,rheology_type,vessel_type
+integer,intent(in) :: mesh_type_len,bc_type_len,rheology_type_len,vessel_type_len
+character(len=MAX_STRING_LEN) :: mesh_type_f,bc_type_f,rheology_type_f,vessel_type_f
 real(dp),intent(in) :: inlet_flow,inlet_pressure,outlet_pressure
 
 call strncpy(mesh_type_f, mesh_type, mesh_type_len)
 call strncpy(bc_type_f, bc_type, bc_type_len)
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-call so_evaluate_prq(mesh_type_f,bc_type_f,inlet_flow,inlet_pressure,outlet_pressure)
+call so_evaluate_prq(mesh_type_f,bc_type_f,rheology_type_f,vessel_type_f,inlet_flow,inlet_pressure,outlet_pressure)
 #else
-call evaluate_prq(mesh_type_f,bc_type_f,inlet_flow,inlet_pressure,outlet_pressure)
+call evaluate_prq(mesh_type_f,bc_type_f,rheology_type_f,vessel_type_f,inlet_flow,inlet_pressure,outlet_pressure)
 #endif
 
 end subroutine evaluate_prq_c
