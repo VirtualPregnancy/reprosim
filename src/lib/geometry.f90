@@ -21,6 +21,7 @@ module geometry
   public define_rad_from_file
   public define_rad_from_geom
   public define_ven_rad_from_art
+  public define_capillary_model
   public element_connectivity_1d
   public evaluate_ordering
   public get_final_real
@@ -695,9 +696,52 @@ contains
   end subroutine append_units
 
 !
+!#################################################################################
+!
+subroutine define_capillary_model(define_convolutes,define_generations,define_parallel,define_model)
+  !*Description:* Defines capillary models employed
+    use arrays,only: dp,num_convolutes,num_generations,num_parallel,capillary_model_type
+    use diagnostics, only: enter_exit,get_diagnostics_level
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_CAPILLARY_MODEL" :: DEFINE_CAPILLARY_MODEL
+
+
+    integer, intent(in) :: define_convolutes,define_generations,define_parallel
+
+    character(len=60), intent(in) :: define_model
+
+    character(len=60) :: sub_name
+    integer:: diagnostics_level
+
+    sub_name = 'define_capillary_model'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+    write(*,*) 'entering define capillary model'
+    num_convolutes = define_convolutes
+    num_generations = define_generations
+    num_parallel = define_parallel
+    if(define_model.eq.'byrne_simplified')then
+      capillary_model_type = 1
+      write(*,*) capillary_model_type,num_convolutes,num_generations,num_parallel
+      call calc_capillary_unit_length
+      write(*,*) capillary_model_type,num_convolutes,num_generations,num_parallel
+    else if(define_model.eq.'interface2015')then
+      capillary_model_type = 2
+    else if(define_model.eq.'erlich_resistance')then
+      capillary_model_type = 3
+    else
+      print *,"Unsupported capillary model",define_model
+     call exit(1)
+    endif
+
+     call enter_exit(sub_name,2)
+
+end subroutine define_capillary_model
+
+!
 !###################################################################################
 !
-  subroutine calc_capillary_unit_length(num_convolutes,num_generations)
+  subroutine calc_capillary_unit_length
   !*Description:* Calculates the effective length of a capillary unit based on its total resistance
   ! and assumed radius, given the number of terminal convolute connections and the number of
   ! generations of symmetric intermediate villous branches
@@ -705,14 +749,13 @@ contains
                      node_xyz,elem_nodes,elem_cnct,num_conv,num_conv_gen, &
                      cap_resistance,terminal_resistance,terminal_length, &
                      cap_radius,is_capillary_unit,total_cap_volume,total_cap_surface_area, &
-                     num_elems
+                     num_elems,num_convolutes,num_generations
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
     use indices, only: ne_length,ne_radius,ne_radius_in,ne_radius_out,ne_vol
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
 
-    integer, intent(inout) :: num_convolutes,num_generations
 
     real(dp) :: int_length,int_radius,seg_length,viscosity, &
                 seg_resistance,cap_unit_radius, cap_length, &
@@ -777,7 +820,7 @@ contains
 
       int_radius = int_radius_in - (int_radius_in-int_radius_out)/num_generations*j
 
-      !capillary unit volume and surface area calculation - adding intermediate villous volume 
+      !capillary unit volume and surface area calculation - adding intermediate villous volume
       !and area for the generation
       capillary_unit_vol = capillary_unit_vol + PI * int_radius**2 * int_length
       capillary_unit_area = capillary_unit_area + 2 * PI * int_radius * int_length
@@ -790,7 +833,7 @@ contains
         resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1))
       enddo
       cap_resistance = resistance(num_convolutes) !Pa . s per mm^3 total resistance of terminal capillary conduits
-	
+
       !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
       !of the system by summing the resistance of each generation
 
@@ -812,23 +855,23 @@ contains
     endif
 
     is_capillary_unit = 0
-    !set the effective length of each capillary unit based the total resistance of capillary convolutes   
+    !set the effective length of each capillary unit based the total resistance of capillary convolutes
     do nu=1,num_units
-      ne =units(nu) !Get a terminal unit    
+      ne =units(nu) !Get a terminal unit
       nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
       is_capillary_unit(nc) = 1
       !update element radius
       elem_field(ne_radius,nc) = cap_unit_radius
       elem_field(ne_radius_in,nc) = cap_unit_radius
       elem_field(ne_radius_out,nc) = cap_unit_radius
-      !update element length   
+      !update element length
       elem_field(ne_length,nc) = terminal_length
       !update element direction
       np1=elem_nodes(1,nc)
       np2=elem_nodes(2,nc)
       do j=1,3
         elem_direction(j,nc) = (node_xyz(j,np2) - &
-               node_xyz(j,np1))/elem_field(ne_length,nc)           
+               node_xyz(j,np1))/elem_field(ne_length,nc)
       enddo
 
       !update element volume

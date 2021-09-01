@@ -57,6 +57,9 @@ real(dp),intent(in) :: inlet_flow,inlet_pressure,outlet_pressure
 
 call strncpy(mesh_type_f, mesh_type, mesh_type_len)
 call strncpy(bc_type_f, bc_type, bc_type_len)
+call strncpy(vessel_type_f, vessel_type, vessel_type_len)
+call strncpy(rheology_type_f, rheology_type, rheology_type_len)
+
 
 #if defined _WIN32 && defined __INTEL_COMPILER
 call so_evaluate_prq(mesh_type_f,bc_type_f,rheology_type_f,vessel_type_f,inlet_flow,inlet_pressure,outlet_pressure)
