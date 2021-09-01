@@ -5,7 +5,7 @@ module arrays
   implicit none
 
   integer :: num_elems,num_nodes,num_units,maxgen,num_arterial_elems, &
-             num_conv,num_conv_gen,anastomosis_elem
+             num_conv,num_conv_gen,anastomosis_elem,num_inlets,num_outlets
   
   integer, parameter :: dp=kind(0.d0) !  for double precision
 
@@ -21,8 +21,9 @@ module arrays
   integer,allocatable :: units(:)
   integer,allocatable :: is_capillary_unit(:)
   integer,allocatable :: art_ven_elem_map(:)
-  integer :: umbilical_inlets(2) !arterial inlets
-  integer :: umbilical_outlets(2) !venous outlet
+  integer, allocatable :: umbilical_inlets(:) !arterial inlets
+  integer, allocatable :: umbilical_outlets(:) !venous outlet
+
 
   real(dp),allocatable :: elem_field(:,:) !properties of elements
   real(dp),allocatable :: elem_direction(:,:)
@@ -43,7 +44,7 @@ module arrays
     num_conv,num_conv_gen,cap_resistance,terminal_resistance,terminal_length, &
     cap_radius,elem_cnct_no_anast,anastomosis_elem, &
     is_capillary_unit,total_cap_volume,total_cap_surface_area,umbilical_inlets,umbilical_outlets, &
-    art_ven_elem_map
+    art_ven_elem_map,num_inlets,num_outlets
 
 contains
   subroutine set_node_field_value(row, col, value)  

@@ -32,7 +32,8 @@ subroutine evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_press
 !                                                                                  
 ! boundary condition type (bc_type): pressure or flow
     use indices
-    use arrays,only: dp,num_elems,num_nodes,elem_field,elem_nodes,elem_cnct,node_xyz
+    use arrays,only: dp,num_elems,num_nodes,elem_field,elem_nodes,elem_cnct,node_xyz,num_inlets,umbilical_inlets,&
+      num_arterial_elems
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_PRQ" :: EVALUATE_PRQ
   
@@ -59,6 +60,8 @@ subroutine evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_press
     logical :: ADD=.FALSE.,CONVERGED=.FALSE.
     character(len=60) :: sub_name
     integer :: no,depvar,nz,ne,SOLVER_FLAG,ne0,ne1,nj,i
+    integer :: inlet_counter, inlet_elem
+    real(dp) ::  outlet_flow, inlet_flow_curr
 
     sub_name = 'evaluate_prq'
     call enter_exit(sub_name,1)
@@ -147,7 +150,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
         
 !! Calculate sparsity structure for solution matrices
     !Determine size of and allocate solution vectors/matrices
-    call calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
+    call calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros,bc_type)
 
  	allocate (SparseCol(NonZeros), STAT = AllocateStatus)    
     if (AllocateStatus /= 0) STOP "*** Not enough memory for SparseCol array ***"
@@ -202,6 +205,18 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2)) !gamma:Pedley correction factor
     !NEED TO UPDATE TERMINAL SOLUTION HERE. LOOP THO' UNITS AND TAKE FLOW AND PRESSURE AT TERMINALS
     call map_flow_to_terminals
 
+
+     do inlet_counter=1,num_inlets
+         inlet_elem = umbilical_inlets(inlet_counter)
+         if(inlet_elem.GT.0)then
+            inlet_flow_curr = elem_field(ne_Qdot,inlet_elem)
+            outlet_flow = elem_field(ne_Qdot,inlet_elem + num_arterial_elems)
+            print *, "Flow at inlet element number ",inlet_elem, "(mm3/s) =",inlet_flow_curr
+	        print *, "Flow at inlet element number ",inlet_elem, "(ml/min) =",inlet_flow_curr * 0.06_dp
+	        print *, "Flow at outlet element number ",inlet_elem + num_arterial_elems, "(mm3/s) =",outlet_flow
+	        print *, "Flow at outlet element number ",inlet_elem + num_arterial_elems, "(ml/min) =",outlet_flow * 0.06_dp
+	      endif
+	 enddo
     deallocate (mesh_from_depvar, STAT = AllocateStatus)
     deallocate (depvar_at_elem, STAT = AllocateStatus)
     deallocate (depvar_at_node, STAT = AllocateStatus)
@@ -235,20 +250,23 @@ depvar_at_elem,prq_solution,mesh_dof,mesh_type)
     character(len=60) ::bc_type,mesh_type
  
   ! local variables
-    integer :: nonode,np,ne,ny1,nj
+    integer :: nonode,np,ne,ny1,nj,count_inlet
     character(len=60) :: sub_name
 
   sub_name = 'boundary_conditions'
   call enter_exit(sub_name,1)
+
   if(.NOT.ADD)THEN
      ! Initial values
      FIX(1:mesh_dof)=.FALSE.
      prq_solution = 0
      ! Fixed boundary conditions  
      ! These are inlet BCs, apply to all inlet BCs (there should only be one)
+     count_inlet = 0
      do ne=1,num_elems
         !ne=elems(noelem)
         if (elem_cnct(-1,0,ne) == 0) THEN !Entry element
+           count_inlet = count_inlet+1
            if(BC_TYPE == 'pressure')THEN          
               np=elem_nodes(1,ne)
               ny1=depvar_at_node(np,1,1) !for fixed pressure BC
@@ -347,7 +365,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
                   num_conv,num_conv_gen,cap_resistance,terminal_resistance, &
                   terminal_length, is_capillary_unit,elem_cnct_no_anast, &
                   total_cap_volume,total_cap_surface_area, umbilical_inlets, &
-                  umbilical_outlets,elem_nodes,node_field,elem_units_below
+                  umbilical_outlets,elem_nodes,node_field,elem_units_below,num_inlets
     use other_consts, only: PI,MAX_FILENAME_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
@@ -363,7 +381,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
                 cof_var_terminal_flow,mean_terminal_flow,small_vessel_volume, diameter, &
                 cap_length,cof_var_cap_flow,inlet_flow,inlet_pressure,outlet_pressure, &
                 resistance,volume_fed_by_inlet,mean_terminal_flow1,mean_terminal_flow2,&
-                std_terminal_flow1,std_terminal_flow2
+                std_terminal_flow1,std_terminal_flow2,outlet_flow
     integer :: strahler_orders(num_elems)
     integer :: generations(num_elems)
     real(dp),allocatable :: diameter_by_strahler(:,:)
@@ -442,7 +460,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
    !calculate total vascular resistance (Pressure in - Pressure out)/Blood Flow in
    inlet_flow = 0.0_dp
    inlet_pressure = 0.0_dp
-   do inlet_counter=1,2
+
+   do inlet_counter=1,num_inlets
       inlet_elem = umbilical_inlets(inlet_counter)
       if(inlet_elem.GT.0)then
          inlet_flow = inlet_flow + elem_field(ne_Qdot,inlet_elem)
@@ -634,12 +653,15 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
    if(count(umbilical_inlets.NE.0).GT.1)then
 
       !print pressure and flow at each inlet
-      do inlet_counter=1,2
+      do inlet_counter=1,num_inlets
          inlet_elem = umbilical_inlets(inlet_counter)
          if(inlet_elem.GT.0)then
             inlet_flow = elem_field(ne_Qdot,inlet_elem)
+            outlet_flow = elem_field(ne_Qdot,inlet_elem + num_arterial_elems)
             print *, "Flow at inlet element number ",inlet_elem, "(mm3/s) =",inlet_flow
-	    print *, "Flow at inlet element number ",inlet_elem, "(ml/min) =",inlet_flow * 0.06_dp
+	        print *, "Flow at inlet element number ",inlet_elem, "(ml/min) =",inlet_flow * 0.06_dp
+	        print *, "Flow at outlet element number ",inlet_elem + num_arterial_elems, "(mm3/s) =",outlet_flow
+	        print *, "Flow at outlet element number ",inlet_elem + num_arterial_elems, "(ml/min) =",outlet_flow * 0.06_dp
             !get the first node
             np1 = elem_nodes(1,inlet_elem)
             inlet_pressure = node_field(nj_bv_press,np1)
@@ -649,7 +671,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
       enddo
 
       !print number of terminal units under each inlet
-      do inlet_counter=1,2
+      do inlet_counter=1,num_inlets
          inlet_elem = umbilical_inlets(inlet_counter)
 	 print *, "Number of terminal units below inlet element",inlet_elem, "=",elem_units_below(inlet_elem)
       enddo
@@ -658,9 +680,9 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size)
       elems_under_inlet2 = .FALSE.
       !populate arrays of arterial elements under each inlet
       !elements directly downstream of the inlets
-      do inlet_counter=1,2
+      do inlet_counter=1,num_inlets
          inlet_elem = umbilical_inlets(inlet_counter)
-	 do n=1,elem_cnct_no_anast(1,0,inlet_elem)
+	 do n=1,elem_cnct_no_anast(1,0,inlet_elem) !Assumes two inlets
             if(inlet_counter.EQ.1)then     
                elems_under_inlet1(elem_cnct_no_anast(1,n,inlet_elem)) = .TRUE.
             else
@@ -877,8 +899,8 @@ subroutine tree_resistance(resistance)
 
     do ne=num_elems,1,-1
        invres=0.0_dp
-       !exclude the anastomosis element if one exists
-       if((anastomosis_elem.EQ.0).OR.(ne.NE.anastomosis_elem))then  
+       !exclude the anastomosis elements if ant exists
+       if(elem_field(ne_group,ne).ne.3.)then!(anastomosis_elem.EQ.0).OR.(ne.NE.anastomosis_elem))then
           num_connected_elems = elem_cnct(1,0,ne)
           if(num_connected_elems.GT.0)then
              daughter_counter = 0
@@ -891,9 +913,11 @@ subroutine tree_resistance(resistance)
              enddo
              if(daughter_counter.GT.0)then
                 elem_res(ne)=elem_res(ne)+1.0_dp/invres !resistance in a series
-             endif
-          endif
-       endif
+             endif !daughters
+          endif !connected
+       else
+          print *, "excluding anastomosis in total resistance calculation", ne
+       endif !not anastomosis
     enddo
 
     !calculate total tree resistance by summing resistances at each inlet in parallel
@@ -950,7 +974,7 @@ subroutine initialise_solution(pressure_in,pressure_out,cardiac_output,mesh_dof,
 !
 !##################################################################
 !
-subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
+subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros,bc_type)
 !*Description:* This subroutine calculates sparsity sizes
 
     use diagnostics, only: enter_exit,get_diagnostics_level
@@ -961,6 +985,7 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
     integer,intent(in) :: depvar_at_elem(0:2,2,num_elems)
     integer,intent(inout) :: MatrixSize
     integer,intent(inout) :: NonZeros
+    character(len=60), intent(in) :: bc_type
 !local variables
     integer :: i,ne,np,fixed_variables, fixed_flows, fixed_pressures
     character(len=60) :: sub_name
@@ -978,7 +1003,7 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
  		endif
  	enddo
  	MatrixSize = mesh_dof - fixed_variables
-  	
+
  	!get count of fixed flows
  	fixed_flows = 0
  	do ne=1,num_elems
@@ -998,7 +1023,8 @@ subroutine calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros)
  		endif
  	enddo
  	NonZeros = NonZeros - fixed_flows
- 	
+
+
  	if(diagnostics_level.GT.1)then
  		print *,"MatrixSize",MatrixSize
  		print *,"NonZeros",NonZeros
@@ -1104,6 +1130,7 @@ subroutine get_variable_offset(depvar,mesh_dof,FIX,offset)
 			offset = offset + 1
 		endif	
 	enddo
+
 	
 end subroutine get_variable_offset
 !
@@ -1113,7 +1140,8 @@ subroutine calc_sparse_1dtree(bc_type,FIX,mesh_dof,depvar_at_elem,depvar_at_node
 SparseCol,SparseRow,SparseVal,RHS,prq_solution)
 !*Description:* This subroutine sets up the system of equations to solve for pressure and flow. It populates the SparseCol,SparseRow, SparceVal and RHS vectors.
     use indices
-    use arrays,only: dp,num_elems,elem_nodes,num_nodes,elems_at_node,elem_cnct,elem_field
+    use arrays,only: dp,num_elems,elem_nodes,num_nodes,elems_at_node,elem_cnct,elem_field,num_arterial_elems,&
+    umbilical_inlets,umbilical_outlets
     use diagnostics, only: enter_exit,get_diagnostics_level
 
 	character(len=60),intent(in) :: bc_type
@@ -1137,13 +1165,17 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
     logical :: ElementPressureEquationDone(num_elems)
     logical :: elem_found,one_node_balanced
     real(dp) :: flow_term
+    integer :: inlet_counter
+    logical :: unfixed_inlet = .False.
     character(len=60) :: sub_name
     integer :: diagnostics_level
     
     sub_name = 'calc_sparse_1dtree'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
-	
+
+
+	inlet_counter = 0
 	!Initialise matrices and indices
     SparseCol=0
     SparseRow=1
@@ -1157,12 +1189,12 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
     ElementPressureEquationDone = .FALSE.
  	offset=0!variable position offset
 	
-    do ne=1,num_elems  	  
+    do ne=1,num_elems
   	  !look at pressure variables at each node
   	  do nn=1,2 !2 nodes in 1D element
 		np=elem_nodes(nn,ne) 
 		depvar = depvar_at_node(np,1,1)
-   	  	if((.NOT.NodePressureDone(np)).AND.(.NOT.FIX(depvar)))then !check if this node is not fixed and hasn't already been processed (as nodes are shared between elements)
+        if((.NOT.NodePressureDone(np)).AND.(.NOT.FIX(depvar)))then !check if this node is not fixed and hasn't already been processed (as nodes are shared between elements)
    	  		ne2=0
    	  		if(nn.EQ.1)then !first node of the element
    	  			ne2=ne! use the current element   	  		
@@ -1185,7 +1217,7 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
    	  				endif 	  			
    	  			endif
    	  		endif
-   	  		if(ne2.GT.0)then 
+   	  		if((ne2.GT.0).and.(.NOT.ElementPressureEquationDone(ne2)))then
    	  			!do the pressure equation for element ne2
  				!pressure for node 1 - pressure for node 2 - resistance * flow at element ne2 = 0							
 				np1=elem_nodes(1,ne2)	
@@ -1222,7 +1254,7 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
 					SparseCol(nzz) = depvar3-offset !variable position in the unknown variable vector
 					SparseVal(nzz)=-elem_field(ne_resist,ne2) !variable coefficient = resistance for element ne2
 					nzz=nzz+1 !next column	 				
-				endif			
+				endif
 				nzz_row=nzz_row+1 !store next row position
 	    			SparseRow(nzz_row)=nzz  			
    	  			NodePressureDone(np) = .TRUE.
@@ -1231,45 +1263,49 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
  	  	endif	  
   	  enddo !nn
   	  
-  	  !look at flow variable for the element	
+  	  !look at flow variable for the element
+
 	  flow_var = depvar_at_elem(0,1,ne)
-	  if(.NOT.FIX(flow_var))then !don't do anything if flow is fixed	  
-	  	one_node_balanced = .FALSE.
-	  	!check if node 1 or node 2 are unbalanced
-      	do nn=1,2 !do flow balance for each element node
-      	  np = elem_nodes(nn,ne)       
-          if((elems_at_node(np,0).GT.1).AND.(.NOT.FlowBalancedNodes(np)))then !if there is more than one element at a node and the node is not already flow balanced
-          	if((bc_type.EQ.'pressure').OR.((bc_type.EQ.'flow').AND.(.NOT.one_node_balanced)))then !do just one flow balance equation for bc_type flow          		
+
+	  if(.NOT.FIX(flow_var))then !don't do anything if flow is fixed
+	  	  one_node_balanced = .FALSE.
+	  	  !check if node 1 or node 2 are unbalanced
+      	  do nn=1,2 !do flow balance for each element node
+      	    np = elem_nodes(nn,ne)
+            if((elems_at_node(np,0).GT.1).AND.(.NOT.FlowBalancedNodes(np)))then !if there is more than one element at a node and the node is not already flow balanced
+          	  if((bc_type.EQ.'pressure').OR.((bc_type.EQ.'flow').AND.(.NOT.one_node_balanced)))then !do just one flow balance equation for bc_type flow
           		!go through each element connected to node np and add the conservation of flow equation for the elements
-          		do noelem2=1,elems_at_node(np,0)            
+          		  do noelem2=1,elems_at_node(np,0)
               		    ne2=elems_at_node(np,noelem2)
               		    depvar=depvar_at_elem(1,1,ne2)              
               		    flow_term = 0
               		    if(np.EQ.elem_nodes(2,ne2))then !end node
-              			flow_term = 1.0_dp              
+              			  flow_term = 1.0_dp
               		    elseif(np.EQ.elem_nodes(1,ne2))then !start node
-              			flow_term = -1.0_dp   
+              			  flow_term = -1.0_dp
               		    endif           
               		    if(FIX(depvar))then           
-              			RHS(nzz_row)=-prq_solution(depvar)*flow_term
+              			  RHS(nzz_row)=-prq_solution(depvar)*flow_term
               		    else
-                		!populate SparseCol and SparseVal
-			  	call get_variable_offset(depvar,mesh_dof,FIX,offset)			
-			  	SparseCol(nzz) = depvar - offset
-              			SparseVal(nzz) = flow_term 
-              			nzz = nzz + 1             	                          
+                		  !populate SparseCol and SparseVal
+			  	          call get_variable_offset(depvar,mesh_dof,FIX,offset)
+			  	          SparseCol(nzz) = depvar - offset
+              			  SparseVal(nzz) = flow_term
+              			  nzz = nzz + 1
               		    endif            
-			enddo  			
+			    enddo
 				FlowBalancedNodes(np) = .TRUE.
 				nzz_row=nzz_row+1 !store next row position
 	    			SparseRow(nzz_row)=nzz	
-	    			one_node_balanced = .TRUE.	    		
+	    			one_node_balanced = .TRUE.
 	    		endif !checking bc_type
- 		  endif !flow at node np is unbalanced
- 		enddo !nn
+
+ 		    endif !flow at node np is unbalanced
+
+ 		  enddo !nn
 	  	
-	  	!if flow balancing hasn't been done for any node for element ne and pressure equation hasn't already been done, do the pressure equation for the element
-	  	if((.NOT.one_node_balanced).AND.(.NOT.ElementPressureEquationDone(ne)))then
+	  	  !if flow balancing hasn't been done for any node for element ne and pressure equation hasn't already been done, do the pressure equation for the element
+	  	  if((.NOT.one_node_balanced).AND.(.NOT.ElementPressureEquationDone(ne)))then
 	  	
   	  		!do the pressure equation for element ne
  			!pressure for node 1 - pressure for node 2 - resistance * flow at element ne = 0		
@@ -1304,13 +1340,15 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution)
 			nzz_row=nzz_row+1 !store next row position
 	    		SparseRow(nzz_row)=nzz 			
    	  		ElementPressureEquationDone(ne) = .TRUE.	  		  
-	  	endif	  
-	  endif
+	  	  endif
+	    endif
+	    unfixed_inlet = .False.
 	enddo !ne
-	if(diagnostics_level.GT.1)then    
-    		print *,"MatrixSize=",MatrixSize
-    		print *,"NonZeros=",NonZeros
-    		do nzz=1,NonZeros
+
+    print *,"MatrixSize=",MatrixSize,nzz_row
+    print *,"NonZeros=",NonZeros,nzz
+    if(diagnostics_level.GT.1)then
+        do nzz=1,NonZeros
   			print *,"SparseCol(",nzz,")",SparseCol(nzz)
   		enddo
   		do nzz_row=1,MatrixSize+1
