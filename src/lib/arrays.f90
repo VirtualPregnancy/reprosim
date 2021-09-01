@@ -23,6 +23,7 @@ module arrays
   integer,allocatable :: art_ven_elem_map(:)
   integer, allocatable :: umbilical_inlets(:) !arterial inlets
   integer, allocatable :: umbilical_outlets(:) !venous outlet
+  integer :: min_art,max_art,min_ven,max_ven
 
 
   real(dp),allocatable :: elem_field(:,:) !properties of elements
@@ -44,7 +45,7 @@ module arrays
     num_conv,num_conv_gen,cap_resistance,terminal_resistance,terminal_length, &
     cap_radius,elem_cnct_no_anast,anastomosis_elem, &
     is_capillary_unit,total_cap_volume,total_cap_surface_area,umbilical_inlets,umbilical_outlets, &
-    art_ven_elem_map,num_inlets,num_outlets
+    art_ven_elem_map,num_inlets,num_outlets,min_art,max_art,min_ven,max_ven
 
 contains
   subroutine set_node_field_value(row, col, value)  

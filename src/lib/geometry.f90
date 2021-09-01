@@ -45,7 +45,7 @@ contains
          nodes,node_xyz,num_elems,&
          num_nodes,num_units,units,num_arterial_elems,umbilical_inlets, &
          umbilical_outlets, art_ven_elem_map,num_inlets,num_outlets,&
-         anastomosis_elem
+         anastomosis_elem,min_art,max_art,min_ven,max_ven
     use indices
     use other_consts,only: PI,MAX_STRING_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
@@ -605,6 +605,19 @@ contains
     		enddo
     		 
     endif !diagnostics_level
+
+     min_art=1
+     ne=1
+     do while(elem_field(ne_group,ne).eq.0.0_dp)
+         max_art=ne
+         ne=ne+1
+     enddo
+     min_ven=ne
+     do while(elem_field(ne_group,ne).eq.2.0_dp)
+         max_ven=ne
+         ne=ne+1
+     enddo
+
        
     deallocate(np_map)
     call enter_exit(sub_name,2)
@@ -695,7 +708,7 @@ contains
                      num_elems
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
-    use indices, only: ne_length,ne_radius,ne_vol
+    use indices, only: ne_length,ne_radius,ne_radius_in,ne_radius_out,ne_vol
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
 
@@ -806,6 +819,8 @@ contains
       is_capillary_unit(nc) = 1
       !update element radius
       elem_field(ne_radius,nc) = cap_unit_radius
+      elem_field(ne_radius_in,nc) = cap_unit_radius
+      elem_field(ne_radius_out,nc) = cap_unit_radius
       !update element length   
       elem_field(ne_length,nc) = terminal_length
       !update element direction
@@ -1068,9 +1083,9 @@ contains
        if(elem_cnct(-1,0,ne).EQ.0)then
           inlet_counter = inlet_counter + 1
           umbilical_inlets_temp(inlet_counter) = ne
-          !if(diagnostics_level.GE.1)then
+          if(diagnostics_level.GE.1)then
              print *,"umbilical inlet element number =",ne
-          !endif
+          endif
        endif
     enddo
 
@@ -1504,7 +1519,7 @@ contains
 
 
      if(diagnostics_level.GT.1)then
-	print *,"element order for element",ne,"=",elem_ordrs(nindex,ne)
+	    print *,"element order for element",ne,"=",elem_ordrs(nindex,ne)
      	print *,"radius for element",ne,"=",elem_field(ne_radius,ne)
      	print *,"radius in for element",ne,"=",elem_field(ne_radius_in,ne)
      	print *,"radius out for element",ne,"=",elem_field(ne_radius_out,ne)
@@ -1982,7 +1997,7 @@ subroutine update_1d_elem_field(ne_field,elem_number,value)
 
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     use arrays,only: dp,elem_field,num_elems
-    use indices,only: num_ne
+    use indices
     use diagnostics, only: enter_exit, get_diagnostics_level
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_UPDATE_1D_ELEM_FIELD" :: UPDATE_1D_ELEM_FIELD
@@ -2006,6 +2021,11 @@ subroutine update_1d_elem_field(ne_field,elem_number,value)
     else
       elem_field(ne_field,elem_number) = value
     endif
+    if(ne_field.eq.ne_radius)then
+      elem_field(ne_radius_in,elem_number) = value
+      elem_field(ne_radius_out,elem_number) = value
+    endif
+
     call enter_exit(sub_name,2)
   end subroutine update_1d_elem_field
  !
