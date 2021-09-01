@@ -15,6 +15,7 @@ module geometry
   public add_matching_mesh
   public append_units
   public calc_capillary_unit_length
+  public create_anastomosis
   public define_1d_elements
   public define_node_geometry
   public define_rad_from_file
@@ -43,7 +44,8 @@ contains
          elem_nodes,elem_ordrs,elem_symmetry,elems_at_node,&
          nodes,node_xyz,num_elems,&
          num_nodes,num_units,units,num_arterial_elems,umbilical_inlets, &
-         umbilical_outlets, art_ven_elem_map
+         umbilical_outlets, art_ven_elem_map,num_inlets,num_outlets,&
+         anastomosis_elem
     use indices
     use other_consts,only: PI,MAX_STRING_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
@@ -198,20 +200,23 @@ contains
        num_elems_new = 2*num_elems + num_units - (umb_elems_count - 3) !there are 3 umbilical venous elements
                                               
     endif
-
+    if(diagnostics_level.gt.1)then
+      write(*,*) 'Adding a matching venous mesh'
+      write(*,*) 'Original number of nodes ', num_nodes, ' elements ',num_elems
+      write(*,*) 'New number of nodes ', num_nodes_new, ' elements ',num_elems_new
+    endif
     allocate(np_map(num_nodes))
     np_map = 0
     allocate(ne_map(num_elems))
     ne_map = 0
     allocate(art_ven_elem_map(num_elems))
     !!! increase the size of node and element arrays to accommodate the additional elements
- 
     call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
     ne0 = num_elems ! the starting local element number
     ne_global = num_elems ! assumes this is the highest element number (!!!)
     np0 = num_nodes ! the starting local node number
     np_global = num_nodes ! assumes this is the highest node number (!!!)
-
+    allocate(umbilical_outlets(num_inlets))
     umbilical_outlets = 0    
     if(umbilical_elem_option.EQ.'single_umbilical_vein')then
 
@@ -247,7 +252,7 @@ contains
        node_counter = node_counter + 1  
 
        !if two inlets then create a new node in between them
-       if(count(umbilical_inlets.NE.0).GT.1)then
+       if(num_inlets.eq.2)then
           np=np_global+node_counter
           umb_ven_nodes(4) = np
           nodes(np0+node_counter)=np
@@ -258,7 +263,7 @@ contains
           enddo
           node_counter = node_counter + 1  
 
-       else
+       elseif(num_inlets.eq.1)then
           !if one inlet copy the first node
           np=np_global+node_counter
           umb_ven_nodes(4) = np
@@ -268,7 +273,8 @@ contains
              node_xyz(nj,np)=node_xyz(nj,np1) + offset(nj)
           enddo
           node_counter = node_counter + 1  
-
+       else
+          write(*,*) 'WARNING! Not implemented for more than two inlets'
        endif
 
        !copy non umbilical arterial nodes
@@ -347,8 +353,10 @@ contains
 
     umb_outlet_counter = 0
     do ne_m=1,num_elems
-        !ne_m=elems(noelem)
         elem_field(ne_group,ne_m)=0.0_dp!ARTERY
+        if(ne_m.eq.anastomosis_elem)then
+          elem_field(ne_group,ne_m) = 3.0_dp !anastomosis
+        endif
         if((umbilical_elem_option.EQ.'same_as_arterial').OR. &
                     ((umbilical_elem_option.EQ.'single_umbilical_vein').AND.(ALL(umbilical_elems.NE.ne_m))))then
            ne=ne_global+elem_counter
@@ -679,7 +687,7 @@ contains
   subroutine calc_capillary_unit_length(num_convolutes,num_generations)
   !*Description:* Calculates the effective length of a capillary unit based on its total resistance
   ! and assumed radius, given the number of terminal convolute connections and the number of
-  ! generations of symmetric intermediate villous branches 
+  ! generations of symmetric intermediate villous branches
     use arrays,only: dp,num_units,units,elem_field,elem_direction, &
                      node_xyz,elem_nodes,elem_cnct,num_conv,num_conv_gen, &
                      cap_resistance,terminal_resistance,terminal_length, &
@@ -817,6 +825,115 @@ contains
     call enter_exit(sub_name,2)
 
   end subroutine calc_capillary_unit_length
+
+
+!
+!###################################################################################
+!
+  subroutine create_anastomosis(node_in,node_out,anast_radius)
+  !*Description:* Creates an anastomosis between two nodes, should be performed after
+  !Full geometry is created., takes on parent vess
+  use arrays,only: dp,num_elems,num_nodes,elems, elem_nodes,elems_at_node,elem_field,&
+    elem_ordrs,elem_cnct,node_xyz,elem_direction
+  use indices
+  use diagnostics, only: enter_exit,get_diagnostics_level
+  implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CREATE_ANASTOMOSIS" :: CREATE_ANASTOMOSIS
+
+  integer, intent(in) :: node_in, node_out
+  real(dp), intent(in) :: anast_radius
+
+  !local arrays
+  integer :: num_nodes_new
+  integer :: num_elems_new
+  integer :: np1,np2
+  integer :: upstream_element(4),downstream_element(4),i,num_elem_upstream,num_elem_downstream
+  integer :: nindex,j
+  character(len=60) :: sub_name
+  integer:: diagnostics_level
+
+  sub_name = 'create_anastomosis'
+  call enter_exit(sub_name,1)
+  call get_diagnostics_level(diagnostics_level)
+
+  write(*,*) 'Creating an anastomosis between', node_in,node_out
+
+  np1 = node_in
+  num_elem_upstream = 0
+  do i =1,elems_at_node(np1,0)
+   !need the element that it sits at the end of
+   if (elem_nodes(2,elems_at_node(np1,i)).eq.np1)then
+     num_elem_upstream = num_elem_upstream+1
+     upstream_element(num_elem_upstream) = elems_at_node(np1,i)
+   endif
+  enddo
+  num_elem_downstream = 0
+  np2 = node_out
+    do i =1,elems_at_node(np2,0)
+     if (elem_nodes(1,elems_at_node(np2,i)).eq.np2)then
+     num_elem_downstream = num_elem_downstream+1
+     downstream_element(num_elem_downstream) = elems_at_node(np2,i)
+   endif
+  enddo
+
+  num_nodes_new = num_nodes
+  num_elems_new = num_elems+1
+  !!! increase the size of node and element arrays to accommodate the additional elements
+  call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
+
+  elems(num_elems_new)=num_elems_new
+  elem_nodes(1,num_elems_new)=np1
+  elem_nodes(2,num_elems_new)=np2
+  elems_at_node(np1,0)=elems_at_node(np1,0)+1
+  elems_at_node(np1,elems_at_node(np1,0))=num_elems_new
+  elems_at_node(np2,0)=elems_at_node(np2,0)+1
+  elems_at_node(np2,elems_at_node(np2,0))=num_elems_new
+
+  !Adopt order of upstream element
+   nindex=no_gen
+   elem_ordrs(nindex,num_elems_new)=elem_ordrs(nindex,upstream_element(1))
+   nindex=no_sord
+   elem_ordrs(nindex,num_elems_new)=elem_ordrs(nindex,upstream_element(1))
+   nindex=no_hord
+   elem_ordrs(nindex,num_elems_new)=elem_ordrs(nindex,upstream_element(1))
+   elem_field(ne_group,num_elems_new)=3.0_dp! denotes anastomosis
+
+   !Work out element connectivity
+   do i = 1,num_elem_upstream
+     !Add this element as a downstream to each upstream element
+     elem_cnct(1,0,upstream_element(i))=elem_cnct(1,0,upstream_element(i))+1
+     elem_cnct(1,elem_cnct(1,0,upstream_element(i)),upstream_element(i))=num_elems_new
+     !Add the upstream elements as upstream elements to this one
+     elem_cnct(-1,0,num_elems_new)=elem_cnct(-1,0,num_elems_new)+1
+     elem_cnct(-1,elem_cnct(-1,0,num_elems_new),num_elems_new)=upstream_element(i)
+   enddo
+
+    do i = 1,num_elem_downstream
+     !Add this element as an upstream to each downstream element
+     elem_cnct(-1,0,downstream_element(i))=elem_cnct(-1,0,downstream_element(i))+1
+     elem_cnct(-1,elem_cnct(-1,0,downstream_element(i)),downstream_element(i))=num_elems_new
+     !Add the downstream elements as downstream elements to this one
+     elem_cnct(1,0,num_elems_new)=elem_cnct(1,0,num_elems_new)+1
+     elem_cnct(1,elem_cnct(1,0,num_elems_new),num_elems_new)=downstream_element(i)
+   enddo
+
+  elem_field(ne_radius,num_elems_new) = anast_radius
+  elem_field(ne_radius_in,num_elems_new) = anast_radius
+  elem_field(ne_radius_out,num_elems_new) = anast_radius
+
+  elem_field(ne_length,num_elems_new) = DSQRT((node_xyz(1,np2) - &
+            node_xyz(1,np1))**2 + (node_xyz(2,np2) - &
+            node_xyz(2,np1))**2 + (node_xyz(3,np2) - &
+            node_xyz(3,np1))**2)
+  do j=1,3
+     elem_direction(j,num_elems_new) = (node_xyz(j,np2) - &
+               node_xyz(j,np1))/elem_field(ne_length,num_elems_new)
+  enddo
+
+  num_elems = num_elems_new
+  call enter_exit(sub_name,2)
+
+ end subroutine create_anastomosis
 !
 !###################################################################################
 !
@@ -825,7 +942,7 @@ contains
     use arrays,only: dp, elem_direction,elem_field,elems,elem_cnct,elem_nodes,&
          elem_ordrs,elem_symmetry,elems_at_node,elem_units_below,&
          node_xyz,num_elems,num_nodes,elem_cnct_no_anast,anastomosis_elem, &
-         umbilical_inlets
+         umbilical_inlets,num_inlets
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
@@ -835,7 +952,7 @@ contains
     integer, optional :: anastomosis_elem_in
     !     Local Variables
     integer :: ibeg,iend,ierror,i_ss_end,j,ne,ne_global,&
-         nn,np,np1,np2,np_global,inlet_counter
+         nn,np,np1,np2,np_global,inlet_counter,umbilical_inlets_temp(100)
     character(LEN=132) :: ctemp1
     character(LEN=40) :: sub_string
     character(len=60) :: sub_name
@@ -845,6 +962,7 @@ contains
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
 
+    !Define the anastomoses that are created OUTSIDE of the simulator (that form part of the read in geometry)
     anastomosis_elem = anastomosis_elem_in
 
     open(10, file=ELEMFILE, status='old')
@@ -861,16 +979,16 @@ contains
     end do read_number_of_elements
 
 !!! allocate memory for element arrays
-    if(allocated(elems)) deallocate(elems)
+    if(allocated(elems)) deallocate(elems) !Array that defines nodal connections between elements
     allocate(elems(num_elems))
-    if(allocated(elem_cnct)) deallocate(elem_cnct)
+    if(allocated(elem_cnct)) deallocate(elem_cnct) !Array that defines connections between elements
     allocate(elem_cnct(-1:1,0:2,0:num_elems))
-    if(allocated(elem_cnct_no_anast)) deallocate(elem_cnct_no_anast)
+    if(allocated(elem_cnct_no_anast)) deallocate(elem_cnct_no_anast) !same array but neglects anastomoses
     allocate(elem_cnct_no_anast(-1:1,0:2,0:num_elems))
     if(allocated(elem_nodes)) deallocate(elem_nodes)
-    allocate(elem_nodes(2,num_elems))
+    allocate(elem_nodes(2,num_elems)) !defines in and out nodes at each element
     if(allocated(elem_ordrs)) deallocate(elem_ordrs)
-    allocate(elem_ordrs(num_ord,num_elems))
+    allocate(elem_ordrs(num_ord,num_elems)) !Defines generation, Strahler and Horsfield order of a vessl
     if(allocated(elem_symmetry)) deallocate(elem_symmetry)
     allocate(elem_symmetry(num_elems))
     if(allocated(elem_units_below)) deallocate(elem_units_below)
@@ -945,16 +1063,24 @@ contains
 
     !populate umbilical_inlets array
     inlet_counter = 0
-    umbilical_inlets = 0
+    umbilical_inlets_temp = 0
     do ne=1,num_elems
        if(elem_cnct(-1,0,ne).EQ.0)then
           inlet_counter = inlet_counter + 1
-          umbilical_inlets(inlet_counter) = ne
-          if(diagnostics_level.GE.1)then
+          umbilical_inlets_temp(inlet_counter) = ne
+          !if(diagnostics_level.GE.1)then
              print *,"umbilical inlet element number =",ne
-          endif
+          !endif
        endif
     enddo
+
+    if(allocated(umbilical_inlets)) deallocate(umbilical_inlets)
+    allocate(umbilical_inlets(inlet_counter))
+
+    umbilical_inlets = umbilical_inlets_temp(1:inlet_counter)
+    num_inlets = inlet_counter
+
+
     if(count(umbilical_inlets.NE.0).EQ.0)then
        print *,"inlet not found"
        call exit(1)
@@ -1103,7 +1229,7 @@ contains
 
     use arrays,only: dp,elem_field,elem_cnct,elem_nodes,&
          elems_at_node,num_elems,num_nodes, num_arterial_elems, elem_ordrs, &
-         umbilical_inlets
+         umbilical_inlets,num_inlets
     use indices,only: ne_length,ne_radius,ne_radius_in,ne_radius_out,no_sord, &
                     no_hord,ne_vol 
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
@@ -1124,7 +1250,7 @@ contains
     LOGICAL :: versions
     real(dp) :: radius,start_rad
     character(len=MAX_STRING_LEN) ::  venous_option
-    integer :: inlet_ord(2) = 0 !Strahler or Horsfield orders for arterial inlets
+    integer :: inlet_ord(num_inlets) !Strahler or Horsfield orders for arterial inlets
     character(len=60) :: sub_name
     integer :: diagnostics_level
 
@@ -1222,17 +1348,19 @@ contains
        else if(ORDER_SYSTEM(1:5).eq.'horsf')then
           nindex = no_hord !for Horsfield ordering
        endif
-
+       inlet_ord = 0
        ! get the inlet element 
        ! if two inlets, get the one with a higher order
        start_elem = umbilical_inlets(1)
        if(count(umbilical_inlets.NE.0).GT.1)then
-           do indx=1,2
+           do indx=1,num_inlets
               inlet_ord(indx) = elem_ordrs(nindex,umbilical_inlets(indx))
+              if(indx.gt.1)then
+                if(inlet_ord(indx-1).LT.inlet_ord(indx))then
+                   start_elem = umbilical_inlets(indx)
+                endif
+              endif
            enddo
-           if(inlet_ord(1).LT.inlet_ord(2))then
-              start_elem = umbilical_inlets(2)
-           endif
        endif
 
        start_rad = elem_field(ne_radius,start_elem)
@@ -1522,7 +1650,6 @@ contains
     elem_cnct_no_anast = 0 !initialise
 
     DO ne=1,num_elems
-       !     ne_global=elems(noelem)
        IF(NNT == 2) THEN !1d
           np1=elem_nodes(1,ne) !first local node
           np2=elem_nodes(2,ne) !second local node

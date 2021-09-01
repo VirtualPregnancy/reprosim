@@ -66,6 +66,26 @@ contains
 !
 !###################################################################################
 !
+!
+  subroutine create_anastomosis_c(node_in, node_out, anast_radius) &
+    bind(C, name="create_anastomosis_c")
+    use geometry, only: create_anastomosis
+    use arrays, only: dp
+
+    integer, intent(in) :: node_in,node_out
+    real(dp), intent(in) :: anast_radius
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+   call so_create_anastomosis(node_in, node_out, anast_radius)
+#else
+  call create_anastomosis(node_in, node_out, anast_radius)
+#endif
+
+  end subroutine create_anastomosis_c
+
+!
+!###################################################################################
+!
   subroutine define_1d_elements_c(ELEMFILE, filename_len, anastomosis_elem_in) &
               bind(C, name="define_1d_elements_c")
 

@@ -62,7 +62,7 @@ contains
     ne_vol=5!element volume
     ne_Qdot=7 !flow in an element
     ne_resist=8 !resistance of a blood vessel
-    ne_group=9!Groups vessels into arteries (field=0), capillaries (field=1) and veins(field=2)
+    ne_group=9!Groups vessels into arteries (field=0), capillaries (field=1),veins(field=2),anastomoses(field=3)
     !indices for units
     num_nu=2
     nu_perf=1
