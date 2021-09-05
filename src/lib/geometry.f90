@@ -716,15 +716,13 @@ subroutine define_capillary_model(define_convolutes,define_generations,define_pa
     sub_name = 'define_capillary_model'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
-    write(*,*) 'entering define capillary model'
+
     num_convolutes = define_convolutes
     num_generations = define_generations
     num_parallel = define_parallel
     if(define_model.eq.'byrne_simplified')then
       capillary_model_type = 1
-      write(*,*) capillary_model_type,num_convolutes,num_generations,num_parallel
       call calc_capillary_unit_length
-      write(*,*) capillary_model_type,num_convolutes,num_generations,num_parallel
     else if(define_model.eq.'interface2015')then
       capillary_model_type = 2
     else if(define_model.eq.'erlich_resistance')then
@@ -752,14 +750,16 @@ end subroutine define_capillary_model
                      num_elems,num_convolutes,num_generations
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
-    use indices, only: ne_length,ne_radius,ne_radius_in,ne_radius_out,ne_vol
+    use indices, only: ne_length,ne_radius,ne_radius_in,ne_radius_out,ne_vol,ne_sa,&
+                     ne_artvol,ne_artsa,ne_veinvol,ne_veinsa
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
 
 
     real(dp) :: int_length,int_radius,seg_length,viscosity, &
                 seg_resistance,cap_unit_radius, cap_length, &
-                capillary_unit_vol, capillary_unit_area
+                capillary_unit_vol, capillary_unit_area,&
+                arteriole_vol,arteriole_area,venule_vol,venule_area
     real(dp) :: int_radius_in,int_radius_out
     real(dp),allocatable :: resistance(:)
     integer :: ne,nu,i,j,np1,np2,nc,nv
@@ -803,9 +803,9 @@ end subroutine define_capillary_model
     int_radius_in = (elem_field(ne_radius,ne)+elem_field(ne_radius,nv))/2.0_dp ! mm radius of inlet intermediate villous (average of artery and vein)
     int_radius_out=(0.03_dp + 0.03_dp/2.0_dp)/2.0_dp ! mm radius of mature intermediate villous (average of artery and vein)
     int_length=1.5_dp !mm Length of each intermediate villous
-    cap_length=3_dp/num_convolutes !mm length of capillary convolutes
+    cap_length=3_dp/dble(num_convolutes) !mm length of capillary convolutes
     cap_radius=0.0144_dp/2.0_dp !radius of capillary convolutes
-    seg_length=int_length/num_convolutes !lengh of each intermediate villous segment
+    seg_length=int_length/dble(num_convolutes) !lengh of each intermediate villous segment
     viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
     cap_unit_radius = 0.03_dp
     cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
@@ -813,24 +813,31 @@ end subroutine define_capillary_model
 
     !calculate total capillary unit volume and surface area so that this can be used by subroutine calculate_stats
     !in module pressure_resistance_flow
-    capillary_unit_vol = PI * cap_radius**2 * cap_length * num_convolutes * num_generations
-    capillary_unit_area = 2 * PI * cap_radius * cap_length * num_convolutes * num_generations
-
+    capillary_unit_vol = 0.0_dp
+    capillary_unit_area = 0.0_dp
+    arteriole_vol = 0.0_dp
+    arteriole_area = 0.0_dp
+    venule_vol = 0.0_dp
+    venule_area = 0.0_dp
     do j=1,num_generations
 
       int_radius = int_radius_in - (int_radius_in-int_radius_out)/num_generations*j
 
       !capillary unit volume and surface area calculation - adding intermediate villous volume
       !and area for the generation
-      capillary_unit_vol = capillary_unit_vol + PI * int_radius**2 * int_length
-      capillary_unit_area = capillary_unit_area + 2 * PI * int_radius * int_length
 
-      seg_resistance=(8.d0*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
+      capillary_unit_vol = capillary_unit_vol + PI * cap_radius**2.0_dp * cap_length * dble(num_convolutes) * 2.0_dp**dble(j)
+      capillary_unit_area = capillary_unit_area + 2.0_dp * PI * cap_radius * cap_length * dble(num_convolutes) * 2.0_dp**dble(j)
+      arteriole_vol = arteriole_vol + PI * int_radius**2.0_dp * int_length* dble(num_convolutes)* 2.0_dp**dble(j)
+      arteriole_area = arteriole_area + 2.0_dp * PI * int_radius * int_length* dble(num_convolutes)* 2.0_dp**dble(j)
+
+
+      seg_resistance=(8.0_dp*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
       !calculate total resistance of terminal capillary conduits
       i=1
-      resistance(i)= cap_resistance + 2.d0*seg_resistance
+      resistance(i)= cap_resistance + 2.0_dp*seg_resistance
       do i=2,num_convolutes
-        resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1))
+        resistance(i)=2.0_dp*seg_resistance + 1.0_dp/(1.0_dp/cap_resistance + 1.0_dp/resistance(i-1))
       enddo
       cap_resistance = resistance(num_convolutes) !Pa . s per mm^3 total resistance of terminal capillary conduits
 
@@ -840,10 +847,10 @@ end subroutine define_capillary_model
       terminal_resistance = terminal_resistance + cap_resistance/2**j
     enddo
 
-    terminal_length = terminal_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
+    terminal_length = terminal_resistance*(PI*cap_unit_radius**4.0_Dp)/(8.0_dp*viscosity)
 
-    total_cap_volume = capillary_unit_vol * num_units/1000 !in cm**3
-    total_cap_surface_area = capillary_unit_area * num_units/100 !in cm**2
+    total_cap_volume = capillary_unit_vol * num_units/1000.0_dp !in cm**3
+    total_cap_surface_area = capillary_unit_area * num_units/100.0_dp !in cm**2
 
     if(diagnostics_level.GE.2)then
       print *, "Resistance of capillary conduits=",cap_resistance
@@ -874,10 +881,14 @@ end subroutine define_capillary_model
                node_xyz(j,np1))/elem_field(ne_length,nc)
       enddo
 
-      !update element volume
-      elem_field(ne_vol,nc) = PI * elem_field(ne_radius,nc)**2 * &
-            elem_field(ne_length,nc)
-
+      !update element volume, and sa
+      elem_field(ne_vol,nc) = capillary_unit_vol
+      elem_field(ne_sa,nc) = capillary_unit_area
+      elem_field(ne_artvol,nc) = arteriole_vol
+      elem_field(ne_artsa,nc) = arteriole_area
+      !In this simplified model there is no difference between arteries and veins
+      elem_field(ne_veinvol,nc) = arteriole_vol
+      elem_field(ne_veinsa,nc) = arteriole_area
     enddo
 
     call enter_exit(sub_name,2)
