@@ -76,12 +76,12 @@ subroutine evaluate_prq(mesh_type,bc_type,rheology_type,vessel_type,inlet_flow,i
 
 iterative = .false.
 
-!if(diagnostics_level.GT.1)then
+if(diagnostics_level.GT.1)then
 	print *, "mesh_type=",mesh_type
 	print *, "bc_type=",bc_type
 	print *, "rheology_type=",rheology_type
 	print *, "vessel_type=",vessel_type
-!endif
+endif
 
 if((mesh_type.NE.'full_plus_tube').AND.(mesh_type.NE.'simple_tree'))then
 	print *,"unsupported mesh_type",mesh_type
@@ -187,10 +187,17 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
      call boundary_conditions(ADD,FIX,bc_type,density,inletbc,outletbc,&
             depvar_at_node,depvar_at_elem,prq_solution,mesh_dof,mesh_type)
 
-!!!update capillary lengths and radii
-!    call capillary_unit_length(6,3)
 !! Calculate resistance of each element
     call calculate_resistance(viscosity,mesh_type)
+    !Initialise capillary resistance (with dummy pressures)
+    if(capillary_model_type.gt.1)then
+      do nu = 1,num_units
+         ne = units(nu)
+         nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
+         call capillary_resistance(nc,vessel_type,rheology_type,4000.0_dp,3000.0_dp,cap_res,.False.)
+         elem_field(ne_resist,nc) = cap_res
+      enddo
+    endif
 
 
 !! Calculate sparsity structure for solution matrices
@@ -227,7 +234,6 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
          solver_solution(no)=prq_solution(depvar)
       endif
    enddo !mesh_dof
-    write(*,*) 'entering vessel typeness', vessel_type,rheology_type
    if((vessel_type.eq."rigid").and.(rheology_type.eq."constant_visc").and.(capillary_model_type.eq.1))then
 
      !! ----CALL SOLVER----
@@ -247,7 +253,6 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
        endif
      enddo
    else
-     write(*,*) 'should be iterating'
      iteration_counter = 0
      converged = .False.
      !need an interative loop as problem is non-linear
@@ -530,6 +535,7 @@ subroutine calculate_resistance(viscosity,mesh_type)
        if(diagnostics_level.GT.1)then
        		print *,"TESTING RESISTANCE: element",ne,"resistance",elem_field(ne_resist,ne),"radius",elem_field(ne_radius,ne)
        endif
+
     enddo
 
     call enter_exit(sub_name,2)
@@ -678,11 +684,9 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
    if(capillary_model_type.eq.1)then
       print *, "Resistance of individual capillary conduits (Pa.s/mm**3) =",cap_resistance
       print *, "Resistance of terminal unit (Pa.s/mm**3) =",terminal_resistance
-      print *, "Effective length of each terminal unit (mm) =",terminal_length
    else
       print *, "Baseline resistance of individual capillary conduits (Pa.s/mm**3) =",cap_resistance
       print *, "Average (mean) resistance of terminal unit (Pa.s/mm**3) =", sum_cap_resistance/dble(num_units)
-      print *, "Effective length of each terminal unit (mm) =", sum_terminal_lengths/dble(num_units)
 
    end if
 
@@ -1628,75 +1632,6 @@ SparseCol,SparseRow,SparseVal,RHS,prq_solution,update_resistance_entries,update_
   end subroutine calc_sparse_1dtree
 !##################################################
 !
-subroutine capillary_unit_length
-  !*Description:* Calculates the effective length of a capillary unit based on its total resistance
-  ! and assumed radius, given the number of terminal convolute connections and the number of
-  ! generations of symmetric intermediate villous branches
-    use arrays
-    use diagnostics, only: enter_exit,get_diagnostics_level
-    use other_consts, only: PI
-    use indices
-    implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
-
-
-    real(dp) :: int_length,int_radius,seg_length,viscosity, &
-                seg_resistance,cap_unit_radius, cap_length, &
-                capillary_unit_vol, capillary_unit_area
-    real(dp) :: int_radius_in,int_radius_out
-    real(dp),allocatable :: resistance(:)
-    integer :: ne,nu,i,j,np1,np2,nc,nv
-    integer :: AllocateStatus
-    character(len=60) :: vessel_type2,rheology_type2
-    character(len=60) :: sub_name
-    integer:: diagnostics_level
-
-    sub_name = 'calc_terminal_unit_length'
-    call enter_exit(sub_name,1)
-    call get_diagnostics_level(diagnostics_level)
-
-    !Allocates an array that defines units as capillaries or not, could potentially be deleted
-    !As ne_group determines this
-    allocate(is_capillary_unit(num_elems), STAT = AllocateStatus)
-    if (AllocateStatus /= 0)then
-       STOP "*** Not enough memory for is_capillary_unit array ***"
-    endif
-
-    cap_unit_radius = 0.03_dp
-    viscosity = 0.33600e-02_dp
-    ne =units(1) !Get a terminal unit
-    nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
-    vessel_type2='rigid'
-    rheology_type2='constant_visc'
-    call capillary_resistance(nc,vessel_type2,rheology_type2,3000.0_dp,500.0_dp,terminal_resistance,.false.)
-
-    terminal_length = terminal_resistance*(PI*cap_unit_radius**4.0_dp)/(8.0_dp*viscosity)
-    is_capillary_unit = 0
-
-    !set the effective length of each capillary unit based the total resistance of capillary convolutes
-    do nu=1,num_units
-      ne =units(nu) !Get a terminal unit
-      nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
-      is_capillary_unit(nc) = 1
-      !update element radius
-      elem_field(ne_radius,nc) = cap_unit_radius
-      elem_field(ne_radius_in,nc) = cap_unit_radius
-      elem_field(ne_radius_out,nc) = cap_unit_radius
-      !update element length
-      elem_field(ne_length,nc) = terminal_length
-      !update element direction
-      np1=elem_nodes(1,nc)
-      np2=elem_nodes(2,nc)
-      do j=1,3
-        elem_direction(j,nc) = (node_xyz(j,np2) - &
-               node_xyz(j,np1))/elem_field(ne_length,nc)
-      enddo
-
-    enddo
-
-    call enter_exit(sub_name,2)
-
-  end subroutine capillary_unit_length
 
 subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_out,resistance,export_terminals)
     use indices
@@ -1750,7 +1685,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
     else
       numparallel = 1 !Number of convolute units in parallel !dummy variable of 1 but could be updated if needed
       !Actual variables
-      numseries = 1 !Number of terminal villi in a row from a single mature intermediate villous
+      numseries = 3 !Number of terminal villi in a row from a single mature intermediate villous
       numparallel_cap = num_parallel !Number of parallel capillaries in an imaged convolute (leiser)
       numconvolutes = num_convolutes!number of  terminal conduits in a single feeding vessel
       numgens = num_generations
@@ -1856,7 +1791,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
     !Put matrix together
     do ng = 1, numgens
       !Radius of branching villi at theis generation
-      int_radius_gen = int_rad_ain - (int_rad_ain-int_rad_aout)/(numgens*ng)
+      int_radius_gen = int_rad_ain + (int_rad_aout-int_rad_ain)/dble(numgens)*(dble(ng)-1)
       if(update_mu.eq.1) then
        call viscosity_from_radius(int_radius_gen*1000.0_dp,0.45_dp,visc_factor)
       endif
@@ -1882,7 +1817,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
       do nc = 1,numconvolutes
         i = (ng-1)*numconvolutes + nc !row number
         !outward branches (arteries)
-        if((nc.eq.1).and.(ng.eq.1))then !Inlet
+        if((nc.eq.1).and.(ng.eq.1))then !Inlet -pressure out -QR =-Pressure in
           RHS(i) = -press_in
           SparseRow(i) = 1
           SparseCol(nnz) = i
@@ -1904,7 +1839,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
           SparseCol(nnz) = i
           SparseVal(nnz) = -1.0_dp
           nnz=nnz+1
-          divider = 2.0_dp**(ng-1)
+          divider = 2.0_dp**(ng-1) !FLOW DIVIDES BY 2
           curgen = ng
           checkgen = 1
           do j = 1,i-1
@@ -1938,11 +1873,14 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
     enddo
     !Repeat for veins
     do ng = 1, numgens
-      int_radius_gen = int_rad_vin - (int_rad_vin-int_rad_vout)/(numgens*(numgens - ng + 1))
+
+      int_radius_gen = int_rad_vin + (int_rad_vout-int_rad_vin)/dble(numgens)*(dble(ng)-1.0_dp)
+
       if(update_mu.eq.1) then
         call viscosity_from_radius(int_radius_gen*1000.0_dp,0.45_dp,visc_factor)
       endif
       R_seg=(8.0_dp*mu*visc_factor*seg_length)/(pi*int_radius_gen**4.0_dp)! %resistance of each intermediate villous segment
+
       total_vein_volume = total_vein_volume +  PI*int_radius_gen**2.0_dp*seg_length*dble(numconvolutes)*&
               (2.0_dp**dble(ng))
       total_vein_surface_area = total_vein_surface_area + PI*2.0_dp*int_radius_gen*seg_length*dble(numconvolutes)&
@@ -2072,7 +2010,8 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
              p_in  = Solution(update_resist(nnz,3)-1)-11.0_dp*133.0_dp
            endif
            p_out = Solution(update_resist(nnz,3))-11.0_dp*133.0_dp
-           int_radius_gen = int_rad_ain - (int_rad_ain-int_rad_aout)/(numgens*update_resist(nnz,2))
+           int_radius_gen = int_rad_ain + (int_rad_aout-int_rad_ain)/dble(numgens)*(dble(update_resist(nnz,2))-1.0_dp)
+
            r_in = int_radius_gen+3.0_dp*int_radius_gen**2*p_in/(4.0_dp*elastance*h)
            r_out = int_radius_gen+3.0_dp*int_radius_gen**2*p_out/(4.0_dp*elastance*h)
            r_ave = (r_in + r_out)/2.0_dp
@@ -2084,7 +2023,8 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
              p_out  = Solution(update_resist(nnz,3)+1)-11.0_dp*133.0_dp
            endif
            p_in = Solution(update_resist(nnz,3))-11.0_dp*133.0_dp
-           int_radius_gen = int_rad_vin - (int_rad_vin-int_rad_vout)/(numgens*update_resist(nnz,2))
+           int_radius_gen = int_rad_vin + (int_rad_vout-int_rad_vin)/dble(numgens)*(dble(update_resist(nnz,2))-1.0_dp)
+
            r_in = int_radius_gen+3.0_dp*int_radius_gen**2*p_in/(4.0_dp*elastance*h)
            r_out = int_radius_gen+3.0_dp*int_radius_gen**2*p_out/(4.0_dp*elastance*h)
            r_ave = (r_in + r_out)/2.0_dp
@@ -2119,7 +2059,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
        enddo !while
     endif
     !!Total resistance of capillary system
-    resistance = (press_in-press_out)/Solution(MatrixSize)
+    resistance = (press_in-press_out)/(Solution(MatrixSize))
     !!Effective length of capillary system
     terminal_length = resistance*(PI*(0.03_dp)**4.0_dp)/(8.0_dp*mu)
 
