@@ -809,6 +809,7 @@ end subroutine define_capillary_model
     viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
     cap_unit_radius = 0.03_dp
     cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
+
     terminal_resistance = 0
 
     !calculate total capillary unit volume and surface area so that this can be used by subroutine calculate_stats
@@ -890,6 +891,8 @@ end subroutine define_capillary_model
       elem_field(ne_veinvol,nc) = arteriole_vol
       elem_field(ne_veinsa,nc) = arteriole_area
     enddo
+    !store indvidual capillary resistance for later use
+    !cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
 
     call enter_exit(sub_name,2)
 
