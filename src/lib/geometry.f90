@@ -822,7 +822,7 @@ end subroutine define_capillary_model
     venule_area = 0.0_dp
     do j=1,num_generations
 
-      int_radius = int_radius_in - (int_radius_in-int_radius_out)/num_generations*j
+      int_radius = int_radius_in - (int_radius_in-int_radius_out)/dble(num_generations)*dble(j)
 
       !capillary unit volume and surface area calculation - adding intermediate villous volume
       !and area for the generation
@@ -845,7 +845,7 @@ end subroutine define_capillary_model
       !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
       !of the system by summing the resistance of each generation
 
-      terminal_resistance = terminal_resistance + cap_resistance/2**j
+      terminal_resistance = terminal_resistance + cap_resistance/2.0_dp**dble(j)
     enddo
 
     terminal_length = terminal_resistance*(PI*cap_unit_radius**4.0_Dp)/(8.0_dp*viscosity)
@@ -857,7 +857,7 @@ end subroutine define_capillary_model
       print *, "Resistance of capillary conduits=",cap_resistance
       print *, "Resistance of all generations of capillaries per terminal unit=",terminal_resistance
       print *, "Effective length of each capillary unit (mm)",terminal_length
-      print *, "Total capillary length for the vasculature (cm)",(terminal_length*num_units)/10
+      print *, "Total capillary length for the vasculature (cm)",(terminal_length*num_units)/10.0_dp
       print *, "Total capillary volume (cm**3) = ",total_cap_volume
       print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area
     endif
@@ -892,7 +892,7 @@ end subroutine define_capillary_model
       elem_field(ne_veinsa,nc) = arteriole_area
     enddo
     !store indvidual capillary resistance for later use
-    !cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
+    cap_resistance=(8.0_dp*viscosity*cap_length)/(PI*cap_radius**4.0_dp) !resistance of each capillary convolute segment
 
     call enter_exit(sub_name,2)
 

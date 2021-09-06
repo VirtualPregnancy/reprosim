@@ -33,7 +33,7 @@ subroutine evaluate_prq(mesh_type,bc_type,rheology_type,vessel_type,inlet_flow,i
 ! boundary condition type (bc_type): pressure or flow
     use indices
     use arrays,only: dp,num_elems,num_nodes,elem_field,elem_nodes,elem_cnct,node_xyz,num_inlets,umbilical_inlets,&
-      num_arterial_elems,num_units,units
+      num_arterial_elems,num_units,units,capillary_model_type
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_PRQ" :: EVALUATE_PRQ
   
@@ -144,6 +144,9 @@ if(diagnostics_level.GT.1)then
 	print *, "outletbc",outletbc
 endif
 
+if(capillary_model_type.gt.1)then
+    iterative = .True.
+end if
 !!---------PHYSICAL PARAMETERS-----------
 density=0.10500e-02_dp !kg/cm3 !density:fluid density
 viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
@@ -189,6 +192,7 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
 !! Calculate resistance of each element
     call calculate_resistance(viscosity,mesh_type)
 
+
 !! Calculate sparsity structure for solution matrices
     !Determine size of and allocate solution vectors/matrices
     call calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros,bc_type)
@@ -224,7 +228,8 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
       endif
    enddo !mesh_dof
     write(*,*) 'entering vessel typeness', vessel_type,rheology_type
-   if((vessel_type.eq."rigid").and.(rheology_type.eq."constant_visc"))then
+   if((vessel_type.eq."rigid").and.(rheology_type.eq."constant_visc").and.(capillary_model_type.eq.1))then
+
      !! ----CALL SOLVER----
      call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
          solver_solution, RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)
@@ -577,7 +582,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
                 std_terminal_flow1,std_terminal_flow2,total_surface_area
     real(dp) :: arterial_vasc_volume,arterial_surface_area,arteriole_vasc_volume, &
          arteriole_surface_area,cap_vasc_volume,cap_surface_area,venule_vasc_volume,&
-         venule_surface_area,vein_vasc_volume,vein_surface_area,radius,sum_cap_resistance
+         venule_surface_area,vein_vasc_volume,vein_surface_area,radius,sum_cap_resistance,&
+         sum_terminal_lengths
     real(dp) :: outlet_flow
     integer :: strahler_orders(num_elems)
     integer :: generations(num_elems)
@@ -609,6 +615,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
    vein_vasc_volume = 0.0_dp
    vein_surface_area = 0.0_dp
    sum_cap_resistance = 0.0_dp
+   sum_terminal_lengths = 0.0_dp
+   mean_terminal_flow = 0.0_dp
 
    do ne=1,num_elems
        !RADIUS IS AVERAGE OF THE TWO RADII
@@ -625,7 +633,10 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
       	 venule_surface_area = venule_surface_area  + elem_field(ne_veinsa,ne)
          if(capillary_model_type.gt.1)then
             sum_cap_resistance = sum_cap_resistance + elem_field(ne_resist,ne)
+            sum_terminal_lengths = sum_terminal_lengths + elem_field(ne_length,ne)
          end if
+         mean_terminal_flow = mean_terminal_flow + elem_field(ne_Qdot,ne)
+
       else if(elem_field(ne_group,ne).eq.2)then
         vein_vasc_volume = vein_vasc_volume + PI*radius**2.0_dp*elem_field(ne_length, ne)
         vein_surface_area = vein_surface_area  + PI* 2.0_dp*radius*elem_field(ne_length, ne)
@@ -633,33 +644,33 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
         !Anastomosis
       endif
    enddo
-
+   mean_terminal_flow = mean_terminal_flow/dble(num_units)
    print *, "##########################    ARTERIES   #########################"
    print *, "Arterial elems count",num_arterial_elems
-   print *, "Arterial vascular volume (cm**3/ml) = ",arterial_vasc_volume/1000. !mm3 to cm3
-   print*, "Arterial surface area (cm**2) = ", arterial_surface_area/100.
-   print*, "Arterial surface area (m**2) = ", arterial_surface_area/(100.*10000.)
+   print *, "Arterial vascular volume (cm**3/ml) = ",arterial_vasc_volume/1000.0_dp !mm3 to cm3
+   print*, "Arterial surface area (cm**2) = ", arterial_surface_area/100.0_dp
+   print*, "Arterial surface area (m**2) = ", arterial_surface_area/(100.0_dp*10000.0_dp)
    print *, "##########################    ARTERIES   #########################"
    print *, "###########################  ARTERIOLE  ###########################"
-   print *, "Arteriole vascular volume (cm**3/ml) = ",arteriole_vasc_volume/1000. !mm3 to cm3
-   print*, "Arteriole surface area (cm**3) = ", arteriole_surface_area/100.
-   print*, "Arteriole surface area (m**3) = ", arteriole_surface_area/(100.*10000.)
+   print *, "Arteriole vascular volume (cm**3/ml) = ",arteriole_vasc_volume/1000.0_dp !mm3 to cm3
+   print*, "Arteriole surface area (cm**3) = ", arteriole_surface_area/100.0_dp
+   print*, "Arteriole surface area (m**3) = ", arteriole_surface_area/(100.0_dp*10000.0_dp)
    print *, "###########################  ARTERIOLE  ###########################"
    print *, "##########################   CAPILLARY   ##########################"
    print *, "Capillary elems count",num_units
-   print *, "Capillary vascular volume (cm**3/ml) = ",cap_vasc_volume/1000. !mm3 to cm3
-   print*, "Capillary surface area (cm**3) = ", cap_surface_area/100.
-   print*, "Capillary surface area (m**3) = ", cap_surface_area/(100.*10000.)
+   print *, "Capillary vascular volume (cm**3/ml) = ",cap_vasc_volume/1000.0_dp !mm3 to cm3
+   print*, "Capillary surface area (cm**3) = ", cap_surface_area/100.0_dp
+   print*, "Capillary surface area (m**3) = ", cap_surface_area/(100.0_dp*10000.0_dp)
    print *, "##########################   CAPILLARY   ##########################"
    print *, "############################  VENULE  #############################"
-   print *, "Venule vascular volume (cm**3/ml) = ",venule_vasc_volume/1000. !mm3 to cm3
-   print*, "Venule surface area (cm**3) = ", venule_surface_area/100.
-   print*, "Venule surface area (m**3) = ", venule_surface_area/(100.*10000.)
+   print *, "Venule vascular volume (cm**3/ml) = ",venule_vasc_volume/1000.0_dp !mm3 to cm3
+   print*, "Venule surface area (cm**3) = ", venule_surface_area/100.0_dp
+   print*, "Venule surface area (m**3) = ", venule_surface_area/(100.0_dp*10000.0_dp)
    print *, "############################  VENULE  #############################"
    print *, "###########################   VEINS  #############################"
-   print *, "Vein vascular volume (cm**3/ml) = ",vein_vasc_volume/1000. !mm3 to cm3
-   print*, "Vein surface area (cm**3) = ", vein_surface_area/100.
-   print*, "Vein surface area (m**3) = ", vein_surface_area/(100.*10000.)
+   print *, "Vein vascular volume (cm**3/ml) = ",vein_vasc_volume/1000.0_dp !mm3 to cm3
+   print*, "Vein surface area (cm**3) = ", vein_surface_area/100.0_dp
+   print*, "Vein surface area (m**3) = ", vein_surface_area/(100.0_dp*10000.0_dp)
    print *, "############################   VEINS  #############################"
 
 
@@ -670,7 +681,9 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
       print *, "Effective length of each terminal unit (mm) =",terminal_length
    else
       print *, "Baseline resistance of individual capillary conduits (Pa.s/mm**3) =",cap_resistance
-      print *, "Average (mean) resistance of terminal unit (Pa.s/mm**3) =", sum_cap_resistance/num_units
+      print *, "Average (mean) resistance of terminal unit (Pa.s/mm**3) =", sum_cap_resistance/dble(num_units)
+      print *, "Effective length of each terminal unit (mm) =", sum_terminal_lengths/dble(num_units)
+
    end if
 
 
@@ -806,22 +819,15 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
    endif!outputlevel
 
   !coefficient of variation for terminal flow
-   !standard deviation of flow devided by the mean flow
-   mean_terminal_flow = 0
-   do nu=1,num_units
-      ne = units(nu)
-      mean_terminal_flow = mean_terminal_flow + elem_field(ne_Qdot,ne)
-   enddo
-   mean_terminal_flow = mean_terminal_flow/num_units
    std_terminal_flow = 0
    do nu=1,num_units
       ne = units(nu)
       std_terminal_flow = std_terminal_flow + (elem_field(ne_Qdot,ne) - mean_terminal_flow)**2
    enddo
-   std_terminal_flow = std_terminal_flow/num_units
+   std_terminal_flow = std_terminal_flow/dble(num_units)
    std_terminal_flow = SQRT(std_terminal_flow)
    cof_var_terminal_flow = std_terminal_flow/mean_terminal_flow
-   print *, "Coefficient of variation for terminal flow (%) = ", cof_var_terminal_flow * 100
+   print *, "Coefficient of variation for terminal flow (%) = ", cof_var_terminal_flow * 100.0_dp
    print *, "Mean terminal flow (mm3/s) = ",mean_terminal_flow
    print *, "Standard deviation of terminal flow (mm3/s) = ",std_terminal_flow
 
@@ -951,7 +957,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
             mean_terminal_flow2 = mean_terminal_flow2 + elem_field(ne_Qdot,ne)
          endif
       enddo
-      mean_terminal_flow1 = mean_terminal_flow1/num_units1
+      mean_terminal_flow1 = mean_terminal_flow1/dble(num_units1)
       mean_terminal_flow2 = mean_terminal_flow2/(num_units - num_units1)
 
       std_terminal_flow1 = 0
@@ -964,7 +970,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
             std_terminal_flow2 = std_terminal_flow2 + (elem_field(ne_Qdot,ne) - mean_terminal_flow2)**2
          endif
       enddo
-      std_terminal_flow1 = std_terminal_flow1/num_units1
+      std_terminal_flow1 = std_terminal_flow1/dble(num_units1)
       std_terminal_flow1 = SQRT(std_terminal_flow1)
       cof_var_terminal_flow = std_terminal_flow1/mean_terminal_flow1
       print *, "Coefficient of variation for terminal flow (%) under inlet element", &
@@ -1664,7 +1670,7 @@ subroutine capillary_unit_length
     rheology_type2='constant_visc'
     call capillary_resistance(nc,vessel_type2,rheology_type2,3000.0_dp,500.0_dp,terminal_resistance,.false.)
 
-    terminal_length = terminal_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
+    terminal_length = terminal_resistance*(PI*cap_unit_radius**4.0_dp)/(8.0_dp*viscosity)
     is_capillary_unit = 0
 
     !set the effective length of each capillary unit based the total resistance of capillary convolutes
@@ -1737,14 +1743,13 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
     sub_name = 'capillary_resistance'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
-
     if(capillary_model_type.eq.1)then
        mu=0.33600e-02_dp !; %viscosity
        resistance = 8.0_dp*mu*elem_field(ne_viscfact,nelem)*elem_field(ne_length,nelem)/ &
             (PI*((elem_field(ne_radius_in,nelem)+elem_field(ne_radius_out,nelem))/2.0_dp)**4.0_dp) !laminar resistance
     else
       numparallel = 1 !Number of convolute units in parallel !dummy variable of 1 but could be updated if needed
-
+      !Actual variables
       numseries = 1 !Number of terminal villi in a row from a single mature intermediate villous
       numparallel_cap = num_parallel !Number of parallel capillaries in an imaged convolute (leiser)
       numconvolutes = num_convolutes!number of  terminal conduits in a single feeding vessel
@@ -1753,7 +1758,6 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
       total_cap_volume =0.0_dp
       total_art_volume = 0.0_dp
       total_vein_volume = 0.0_dp
-
       total_cap_surface_area = 0.0_dp
       total_art_surface_area = 0.0_dp
       total_vein_surface_area = 0.0_dp
@@ -1765,8 +1769,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
       cap_length=3.0_dp/dble(numparallel_cap)!%mm %length of individual capillary
       cap_rad=(0.0144_dp)/2.0_dp ! %radius of individual capillary
 
-      visc_factor = 1.0_dp
-
+      visc_factor = 1.0_dp !Initialise viscosity factor
       if(rheology_type.eq.'constant_visc')then
         mu=0.33600e-02_dp !; %viscosity
         update_mu = 0 !Do not need to update viscosity
@@ -1804,13 +1807,12 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
       !In the Interface 2015 model the resistance of a "terminal capillary convolute) is defined anatomically by Leiser
       !Or, we can use the measured resistance of a "terminal capillary convolute" from Erlich
       if(capillary_model_type.eq.3)then
-         R_cap =  5.6e5_dp*numseries/(numparallel)
+         R_cap =  5.6e5_dp*dble(numseries)/dble(numparallel)
          cap_resistance = 5.6e5_dp
-
       else if(capillary_model_type.eq.2)then
-    	R_cap=(8.0_dp*mu*visc_factor*cap_length)/(pi*cap_rad**4.0_dp)*numseries/(numparallel_cap*numparallel)!%resistance of each capillary convolute segment
-        cap_resistance = ((8.0_dp*mu*visc_factor*cap_length)/(pi*cap_rad**4.0_dp))/numparallel_cap
-        write(*,*) cap_resistance,mu,visc_factor,cap_length,cap_rad
+    	R_cap=(8.0_dp*mu*visc_factor*cap_length)/(pi*cap_rad**4.0_dp)*dble(numseries)/&
+                (dble(numparallel_cap)*dble(numparallel))!%resistance of each capillary convolute segment
+        cap_resistance = ((8.0_dp*mu*visc_factor*cap_length)/(pi*cap_rad**4.0_dp))/dble(numparallel_cap)
       endif
 
       p_unknowns = 2*numconvolutes*numgens
@@ -2052,6 +2054,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
     call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
        Solution, RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)
 
+    !!!!!!!!!!!!!!!ONLY IF NOT RIGID!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !We now have pressures - which we can use to update radii and resistances and re-solve
     h=0.8_dp
     elastance = 5.0e5_dp!
@@ -2152,6 +2155,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
     elem_field(ne_artsa,nelem) = total_art_surface_area
     elem_field(ne_veinvol,nelem) = total_vein_volume
     elem_field(ne_veinsa,nelem) = total_vein_surface_area
+    elem_field(ne_length,nelem) = terminal_length
 
     end if
 
