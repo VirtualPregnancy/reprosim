@@ -568,7 +568,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
                   terminal_length, is_capillary_unit,elem_cnct_no_anast, &
                   total_cap_volume,total_cap_surface_area, umbilical_inlets, &
                   umbilical_outlets,elem_nodes,node_field,elem_units_below,num_inlets, &
-                  capillary_model_type
+                  capillary_model_type,num_outlets
     use other_consts, only: PI,MAX_FILENAME_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALCULATE_STATS" :: CALCULATE_STATS
@@ -579,7 +579,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
   !local variables
     integer :: ne,nu,nc,order,max_strahler,no_branches, &
                ne_order,branch,ven_elems,max_gen,np1,np2, &
-               inlet_counter,inlet_elem,outlet_elem,n,num_units1
+               inlet_counter,inlet_elem,outlet_elem,n,num_units1,&
+               outlet_counter
     real(dp) :: total_vasc_volume, &
                 mean_diameter,std_diameter,total_resistance,std_terminal_flow, &
                 cof_var_terminal_flow,mean_terminal_flow,small_vessel_volume, diameter, &
@@ -715,15 +716,15 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
    np2 = elem_nodes(2,outlet_elem)
    outlet_pressure = node_field(nj_bv_press,np2)
    resistance = (inlet_pressure - outlet_pressure)/inlet_flow
-   print *, "######################## OVERALL PRESSURE/FLOW #####################"
-   print *, "Inlet pressure (Pa) =", inlet_pressure
-   print *, "Inlet pressure (mmHg) = ", inlet_pressure/133.322_dp
-   print *, "Outlet pressure (Pa) =", outlet_pressure
-   print *, "Outlet pressure (mmHg) =", outlet_pressure/133.322_dp
-   print *, "Flow (sum of all inlet flows) (mm3/s) =", inlet_flow
-   print *, "Flow (sum of all inlet flows) (ml/min) =", inlet_flow * 0.06_dp
-   print *, "Total vascular resistance (Pin-Pout)/Flow (Pa.s/mm**3) = ",resistance
-   print *, "######################## OVERALL PRESSURE/FLOW #####################"
+ !  print *, "######################## OVERALL PRESSURE/FLOW #####################"
+ !  print *, "Inlet pressure (Pa) =", inlet_pressure
+ !  print *, "Inlet pressure (mmHg) = ", inlet_pressure/133.322_dp
+ !  print *, "Outlet pressure (Pa) =", outlet_pressure
+ !  print *, "Outlet pressure (mmHg) =", outlet_pressure/133.322_dp
+ !  print *, "Flow (sum of all inlet flows) (mm3/s) =", inlet_flow
+ !  print *, "Flow (sum of all inlet flows) (ml/min) =", inlet_flow * 0.06_dp
+ !  print *, "Total vascular resistance (Pin-Pout)/Flow (Pa.s/mm**3) = ",resistance
+ !  print *, "######################## OVERALL PRESSURE/FLOW #####################"
 
    !mean, min, max and std of branch diameter by Strahler order
    if(output_level.gt.0)then
@@ -885,11 +886,9 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
          inlet_elem = umbilical_inlets(inlet_counter)
          if(inlet_elem.GT.0)then
             inlet_flow = elem_field(ne_Qdot,inlet_elem)
-            outlet_flow = elem_field(ne_Qdot,inlet_elem + num_arterial_elems)
             print *, "Flow at inlet element number ",inlet_elem, "(mm3/s) =",inlet_flow
 	        print *, "Flow at inlet element number ",inlet_elem, "(ml/min) =",inlet_flow * 0.06_dp
-	        print *, "Flow at outlet element number ",inlet_elem + num_arterial_elems, "(mm3/s) =",outlet_flow
-	        print *, "Flow at outlet element number ",inlet_elem + num_arterial_elems, "(ml/min) =",outlet_flow * 0.06_dp
+
             !get the first node
             np1 = elem_nodes(1,inlet_elem)
             inlet_pressure = node_field(nj_bv_press,np1)
@@ -897,8 +896,20 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
 	    print *, "Pressure at inlet node",np1,"inlet element",inlet_elem,"(mmHg) =", inlet_pressure/133.322_dp
          endif
       enddo
+     do outlet_counter=1,num_outlets
+          outlet_elem = umbilical_outlets(outlet_counter)
+         if(outlet_elem.GT.0)then
+            outlet_flow = elem_field(ne_Qdot,outlet_elem)
+            print *, "Flow at outlet element number ",outlet_elem, "(mm3/s) =",outlet_flow
+	        print *, "Flow at outlet element number ",outlet_elem, "(ml/min) =",outlet_flow * 0.06_dp
 
-      !print number of terminal units under each inlet
+            !get the first node
+            np1 = elem_nodes(1,outlet_elem)
+            outlet_pressure = node_field(nj_bv_press,np1)
+  	        print *, "Pressure at outlet node",np1,"outlet element",outlet_elem,"(Pa) =", outlet_pressure
+	        print *, "Pressure at outlet node",np1,"outlet element",outlet_elem,"(mmHg) =", outlet_pressure/133.322_dp
+         end if
+      end do
       do inlet_counter=1,num_inlets
          inlet_elem = umbilical_inlets(inlet_counter)
 	 print *, "Number of terminal units below inlet element",inlet_elem, "=",elem_units_below(inlet_elem)

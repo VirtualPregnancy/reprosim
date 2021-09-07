@@ -317,6 +317,7 @@ contains
        ne=ne_global+elem_counter
        umb_ven_elems(1)=ne
        umbilical_outlets(1) = ne !store umbilical venous outlet
+       num_outlets = 1
        elem_field(ne_group,ne)=2.0_dp!VEIN
        elems(ne0+elem_counter)=ne
        elem_nodes(1,ne)=umb_ven_nodes(3)
@@ -365,6 +366,7 @@ contains
            if(.not.ALL(umbilical_inlets.NE.ne_m))then
               umb_outlet_counter = umb_outlet_counter + 1
               umbilical_outlets(umb_outlet_counter) = ne
+              num_outlets = umb_outlet_counter
            endif
            elem_field(ne_group,ne)=2.0_dp!VEIN
            elems(ne0+elem_counter)=ne
