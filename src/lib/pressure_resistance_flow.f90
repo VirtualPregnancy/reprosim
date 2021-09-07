@@ -788,15 +788,16 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
      enddo
 
      !Venous vessel diameter by Strahler order
-
+     write(*,*) 'in do'
      !all elements - arterial elements - number of capillaries (the same as number of terminal units)
      ven_elems = num_elems-num_arterial_elems-num_units
-     if (ven_elems.GT.0)then
+     write(*,*) ven_elems,num_elems,num_arterial_elems,num_units,max_strahler
+     if (ven_elems.GT.0)then!checking there are venous elements
       allocate(ven_diameter_by_strahler(max_strahler,ven_elems))
       ven_diameter_by_strahler = 0
       branch_count = 0
       do ne=num_arterial_elems+1,num_elems
-         if(is_capillary_unit(ne).eq.0)then !if the element is not a capillary
+         if(elem_field(ne_group,ne).eq.2.0_dp)then !vein
             ne_order = strahler_orders(ne)
 	    if(ne_order.ge.1)then
                no_branches = branch_count(ne_order)
@@ -806,6 +807,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
 	    endif
          endif
       enddo
+      write(*,*) 'out do'
       print *, "Venous vessel diameter (mm) by Strahler order:"
       print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
       do order=1, max_strahler
