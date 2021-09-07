@@ -15,7 +15,7 @@
     character(len=MAX_FILENAME_LEN) :: ELEMFILE
     character(LEN=100) :: order_system,order_options,name
     real(dp) :: s_ratio, inlet_rad
-    character(LEN=60) :: mesh_type, bc_type, umbilical_elem_option
+    character(LEN=60) :: mesh_type, bc_type, rheology_type,vessel_type,umbilical_elem_option
     real(dp) :: inlet_flow,inlet_pressure,outlet_pressure
     real(dp) :: test_elem_field(1,8) !(num_ne: num_elems)
     real(dp) :: test_node_field(1,8) !(num_nj : num_nodes)
@@ -53,10 +53,12 @@
       
     mesh_type = "full_plus_tube"
     bc_type = "flow"
+    rheology_type = "constant_visc"
+    vessel_type = "rigid"
     inlet_flow = 111666.7_dp
     inlet_pressure = 0.0_dp
     outlet_pressure = 2660.0_dp
-    call evaluate_prq(mesh_type,bc_type,inlet_flow,inlet_pressure,outlet_pressure)
+    call evaluate_prq(mesh_type,bc_type,rheology_type,vessel_type,inlet_flow,inlet_pressure,outlet_pressure)
       
     !populate test data
     call set_flow(test_elem_field) 

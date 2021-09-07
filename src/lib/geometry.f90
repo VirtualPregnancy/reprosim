@@ -21,6 +21,7 @@ module geometry
   public define_rad_from_file
   public define_rad_from_geom
   public define_ven_rad_from_art
+  public define_capillary_model
   public element_connectivity_1d
   public evaluate_ordering
   public get_final_real
@@ -45,7 +46,7 @@ contains
          nodes,node_xyz,num_elems,&
          num_nodes,num_units,units,num_arterial_elems,umbilical_inlets, &
          umbilical_outlets, art_ven_elem_map,num_inlets,num_outlets,&
-         anastomosis_elem
+         anastomosis_elem,min_art,max_art,min_ven,max_ven
     use indices
     use other_consts,only: PI,MAX_STRING_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
@@ -201,9 +202,9 @@ contains
                                               
     endif
     if(diagnostics_level.gt.1)then
-      write(*,*) 'Adding a matching venous mesh'
-      write(*,*) 'Original number of nodes ', num_nodes, ' elements ',num_elems
-      write(*,*) 'New number of nodes ', num_nodes_new, ' elements ',num_elems_new
+      print *, 'Adding a matching venous mesh'
+      print *, 'Original number of nodes ', num_nodes, ' elements ',num_elems
+      print *, 'New number of nodes ', num_nodes_new, ' elements ',num_elems_new
     endif
     allocate(np_map(num_nodes))
     np_map = 0
@@ -316,6 +317,7 @@ contains
        ne=ne_global+elem_counter
        umb_ven_elems(1)=ne
        umbilical_outlets(1) = ne !store umbilical venous outlet
+       num_outlets = 1
        elem_field(ne_group,ne)=2.0_dp!VEIN
        elems(ne0+elem_counter)=ne
        elem_nodes(1,ne)=umb_ven_nodes(3)
@@ -364,6 +366,7 @@ contains
            if(.not.ALL(umbilical_inlets.NE.ne_m))then
               umb_outlet_counter = umb_outlet_counter + 1
               umbilical_outlets(umb_outlet_counter) = ne
+              num_outlets = umb_outlet_counter
            endif
            elem_field(ne_group,ne)=2.0_dp!VEIN
            elems(ne0+elem_counter)=ne
@@ -605,6 +608,19 @@ contains
     		enddo
     		 
     endif !diagnostics_level
+
+     min_art=1
+     ne=1
+     do while(elem_field(ne_group,ne).eq.0.0_dp)
+         max_art=ne
+         ne=ne+1
+     enddo
+     min_ven=ne
+     do while(elem_field(ne_group,ne).eq.2.0_dp)
+         max_ven=ne
+         ne=ne+1
+     enddo
+
        
     deallocate(np_map)
     call enter_exit(sub_name,2)
@@ -682,9 +698,50 @@ contains
   end subroutine append_units
 
 !
+!#################################################################################
+!
+subroutine define_capillary_model(define_convolutes,define_generations,define_parallel,define_model)
+  !*Description:* Defines capillary models employed
+    use arrays,only: dp,num_convolutes,num_generations,num_parallel,capillary_model_type
+    use diagnostics, only: enter_exit,get_diagnostics_level
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_CAPILLARY_MODEL" :: DEFINE_CAPILLARY_MODEL
+
+
+    integer, intent(in) :: define_convolutes,define_generations,define_parallel
+
+    character(len=60), intent(in) :: define_model
+
+    character(len=60) :: sub_name
+    integer:: diagnostics_level
+
+    sub_name = 'define_capillary_model'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+
+    num_convolutes = define_convolutes
+    num_generations = define_generations
+    num_parallel = define_parallel
+    if(define_model.eq.'byrne_simplified')then
+      capillary_model_type = 1
+      call calc_capillary_unit_length
+    else if(define_model.eq.'interface2015')then
+      capillary_model_type = 2
+    else if(define_model.eq.'erlich_resistance')then
+      capillary_model_type = 3
+    else
+      print *,"Unsupported capillary model",define_model
+     call exit(1)
+    endif
+
+     call enter_exit(sub_name,2)
+
+end subroutine define_capillary_model
+
+!
 !###################################################################################
 !
-  subroutine calc_capillary_unit_length(num_convolutes,num_generations)
+  subroutine calc_capillary_unit_length
   !*Description:* Calculates the effective length of a capillary unit based on its total resistance
   ! and assumed radius, given the number of terminal convolute connections and the number of
   ! generations of symmetric intermediate villous branches
@@ -692,18 +749,19 @@ contains
                      node_xyz,elem_nodes,elem_cnct,num_conv,num_conv_gen, &
                      cap_resistance,terminal_resistance,terminal_length, &
                      cap_radius,is_capillary_unit,total_cap_volume,total_cap_surface_area, &
-                     num_elems
+                     num_elems,num_convolutes,num_generations,num_parallel
     use diagnostics, only: enter_exit,get_diagnostics_level
     use other_consts, only: PI
-    use indices, only: ne_length,ne_radius,ne_vol
+    use indices, only: ne_length,ne_radius,ne_radius_in,ne_radius_out,ne_vol,ne_sa,&
+                     ne_artvol,ne_artsa,ne_veinvol,ne_veinsa
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_CALC_CAPILLARY_UNIT_LENGTH" :: CALC_CAPILLARY_UNIT_LENGTH
 
-    integer, intent(inout) :: num_convolutes,num_generations
 
     real(dp) :: int_length,int_radius,seg_length,viscosity, &
-                seg_resistance,cap_unit_radius, cap_length, &
-                capillary_unit_vol, capillary_unit_area
+                seg_resistance,seg_ven_resistance,cap_unit_radius, cap_length, &
+                capillary_unit_vol, capillary_unit_area,&
+                arteriole_vol,arteriole_area,venule_vol,venule_area
     real(dp) :: int_radius_in,int_radius_out
     real(dp),allocatable :: resistance(:)
     integer :: ne,nu,i,j,np1,np2,nc,nv
@@ -747,80 +805,99 @@ contains
     int_radius_in = (elem_field(ne_radius,ne)+elem_field(ne_radius,nv))/2.0_dp ! mm radius of inlet intermediate villous (average of artery and vein)
     int_radius_out=(0.03_dp + 0.03_dp/2.0_dp)/2.0_dp ! mm radius of mature intermediate villous (average of artery and vein)
     int_length=1.5_dp !mm Length of each intermediate villous
-    cap_length=3_dp/num_convolutes !mm length of capillary convolutes
+    cap_length=3_dp/dble(num_parallel) !mm length of capillary convolutes
     cap_radius=0.0144_dp/2.0_dp !radius of capillary convolutes
-    seg_length=int_length/num_convolutes !lengh of each intermediate villous segment
+    seg_length=int_length/dble(num_convolutes) !lengh of each intermediate villous segment
     viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
     cap_unit_radius = 0.03_dp
-    cap_resistance=(8.d0*viscosity*cap_length)/(PI*cap_radius**4) !resistance of each capillary convolute segment
+    cap_resistance=(8.0_dp*viscosity*cap_length)/(PI*cap_radius**4.0_dp)/dble(num_parallel) !resistance of each capillary convolute segment (6 capillaries in parallel)
+
     terminal_resistance = 0
 
     !calculate total capillary unit volume and surface area so that this can be used by subroutine calculate_stats
     !in module pressure_resistance_flow
-    capillary_unit_vol = PI * cap_radius**2 * cap_length * num_convolutes * num_generations
-    capillary_unit_area = 2 * PI * cap_radius * cap_length * num_convolutes * num_generations
-
+    capillary_unit_vol = 0.0_dp
+    capillary_unit_area = 0.0_dp
+    arteriole_vol = 0.0_dp
+    arteriole_area = 0.0_dp
+    venule_vol = 0.0_dp
+    venule_area = 0.0_dp
     do j=1,num_generations
 
-      int_radius = int_radius_in - (int_radius_in-int_radius_out)/num_generations*j
+      int_radius = int_radius_in - (int_radius_in-int_radius_out)/dble(num_generations)*dble(j)
 
-      !capillary unit volume and surface area calculation - adding intermediate villous volume 
+      !capillary unit volume and surface area calculation - adding intermediate villous volume
       !and area for the generation
-      capillary_unit_vol = capillary_unit_vol + PI * int_radius**2 * int_length
-      capillary_unit_area = capillary_unit_area + 2 * PI * int_radius * int_length
 
-      seg_resistance=(8.d0*viscosity*seg_length)/(PI*int_radius**4) !resistance of each intermediate villous segment
+      capillary_unit_vol = capillary_unit_vol + PI * cap_radius**2.0_dp * cap_length * dble(num_convolutes) &
+              *dble(num_parallel) * 2.0_dp**dble(j)
+      capillary_unit_area = capillary_unit_area + 2.0_dp * PI * cap_radius * cap_length * dble(num_convolutes)&
+              *dble(num_parallel) * 2.0_dp**dble(j)
+      arteriole_vol = arteriole_vol + PI * int_radius**2.0_dp * int_length* dble(num_convolutes)* 2.0_dp**dble(j)
+      arteriole_area = arteriole_area + 2.0_dp * PI * int_radius * int_length* dble(num_convolutes)* 2.0_dp**dble(j)
+
+
+      seg_resistance=(8.0_dp*viscosity*seg_length)/(PI*int_radius**4.0_dp) !resistance of each intermediate villous segment
+      seg_ven_resistance = (8.0_dp*viscosity*seg_length)/(PI*(int_radius*2.0_dp)**4.0_dp) !resistance of each intermediate villous segment
       !calculate total resistance of terminal capillary conduits
       i=1
-      resistance(i)= cap_resistance + 2.d0*seg_resistance
+      resistance(i)= cap_resistance + seg_resistance + seg_ven_resistance
       do i=2,num_convolutes
-        resistance(i)=2.d0*seg_resistance + 1/(1/cap_resistance + 1/resistance(i-1))
+        resistance(i)=seg_resistance + seg_ven_resistance + 1.0_dp/(1.0_dp/cap_resistance + 1.0_dp/resistance(i-1))
       enddo
       cap_resistance = resistance(num_convolutes) !Pa . s per mm^3 total resistance of terminal capillary conduits
-	
+
       !We have symmetric generations of intermediate villous trees so we can calculate the total resistance
       !of the system by summing the resistance of each generation
 
-      terminal_resistance = terminal_resistance + cap_resistance/2**j
+      terminal_resistance = terminal_resistance + cap_resistance/(2.0_dp**dble(j)) !Bifurcating at each level
     enddo
 
-    terminal_length = terminal_resistance*(PI*cap_unit_radius**4)/(8.d0*viscosity)
+    terminal_length = terminal_resistance*(PI*cap_unit_radius**4.0_dp)/(8.0_dp*viscosity)
 
-    total_cap_volume = capillary_unit_vol * num_units/1000 !in cm**3
-    total_cap_surface_area = capillary_unit_area * num_units/100 !in cm**2
+    total_cap_volume = capillary_unit_vol * num_units/1000.0_dp !in cm**3
+    total_cap_surface_area = capillary_unit_area * num_units/100.0_dp !in cm**2
 
     if(diagnostics_level.GE.2)then
       print *, "Resistance of capillary conduits=",cap_resistance
       print *, "Resistance of all generations of capillaries per terminal unit=",terminal_resistance
       print *, "Effective length of each capillary unit (mm)",terminal_length
-      print *, "Total capillary length for the vasculature (cm)",(terminal_length*num_units)/10
+      print *, "Total capillary length for the vasculature (cm)",(terminal_length*num_units)/10.0_dp
       print *, "Total capillary volume (cm**3) = ",total_cap_volume
       print *, "Total capillary surface area (cm**2) = ", total_cap_surface_area
     endif
 
     is_capillary_unit = 0
-    !set the effective length of each capillary unit based the total resistance of capillary convolutes   
+    !set the effective length of each capillary unit based the total resistance of capillary convolutes
     do nu=1,num_units
-      ne =units(nu) !Get a terminal unit    
+      ne =units(nu) !Get a terminal unit
       nc = elem_cnct(1,1,ne) !capillary unit is downstream of a terminal unit
       is_capillary_unit(nc) = 1
       !update element radius
       elem_field(ne_radius,nc) = cap_unit_radius
-      !update element length   
+      elem_field(ne_radius_in,nc) = cap_unit_radius
+      elem_field(ne_radius_out,nc) = cap_unit_radius
+      !update element length
       elem_field(ne_length,nc) = terminal_length
       !update element direction
       np1=elem_nodes(1,nc)
       np2=elem_nodes(2,nc)
       do j=1,3
         elem_direction(j,nc) = (node_xyz(j,np2) - &
-               node_xyz(j,np1))/elem_field(ne_length,nc)           
+               node_xyz(j,np1))/elem_field(ne_length,nc)
       enddo
 
-      !update element volume
-      elem_field(ne_vol,nc) = PI * elem_field(ne_radius,nc)**2 * &
-            elem_field(ne_length,nc)
-
+      !update element volume, and sa
+      elem_field(ne_vol,nc) = capillary_unit_vol
+      elem_field(ne_sa,nc) = capillary_unit_area
+      elem_field(ne_artvol,nc) = arteriole_vol
+      elem_field(ne_artsa,nc) = arteriole_area
+      !In this simplified model there is no difference between arteries and veins
+      elem_field(ne_veinvol,nc) = arteriole_vol*2.0_dp**2.0_dp !double radius
+      elem_field(ne_veinsa,nc) = arteriole_area*2.0_dp !double radius
     enddo
+    !store indvidual capillary resistance for later use
+    cap_resistance=(8.0_dp*viscosity*cap_length)/(PI*cap_radius**4.0_dp)/dble(num_parallel) !resistance of each capillary convolute segment (6 capillaries in parallel)
 
     call enter_exit(sub_name,2)
 
@@ -856,7 +933,7 @@ contains
   call enter_exit(sub_name,1)
   call get_diagnostics_level(diagnostics_level)
 
-  write(*,*) 'Creating an anastomosis between', node_in,node_out
+  print *, 'Creating an anastomosis between', node_in,node_out
 
   np1 = node_in
   num_elem_upstream = 0
@@ -1068,9 +1145,9 @@ contains
        if(elem_cnct(-1,0,ne).EQ.0)then
           inlet_counter = inlet_counter + 1
           umbilical_inlets_temp(inlet_counter) = ne
-          !if(diagnostics_level.GE.1)then
+          if(diagnostics_level.GE.1)then
              print *,"umbilical inlet element number =",ne
-          !endif
+          endif
        endif
     enddo
 
@@ -1462,7 +1539,7 @@ contains
              endif
       	  enddo
       	  if(inlet_count.gt.1)then
-             WRITE(*,*) ' More than one inlet in this group, using last found, ne = ',ne_start
+             print *, ' More than one inlet in this group, using last found, ne = ',ne_start
           endif
        else!element number defined
           read (START_FROM,'(I10)') ne_start
@@ -1504,7 +1581,7 @@ contains
 
 
      if(diagnostics_level.GT.1)then
-	print *,"element order for element",ne,"=",elem_ordrs(nindex,ne)
+	    print *,"element order for element",ne,"=",elem_ordrs(nindex,ne)
      	print *,"radius for element",ne,"=",elem_field(ne_radius,ne)
      	print *,"radius in for element",ne,"=",elem_field(ne_radius_in,ne)
      	print *,"radius out for element",ne,"=",elem_field(ne_radius_out,ne)
@@ -1982,7 +2059,7 @@ subroutine update_1d_elem_field(ne_field,elem_number,value)
 
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     use arrays,only: dp,elem_field,num_elems
-    use indices,only: num_ne
+    use indices
     use diagnostics, only: enter_exit, get_diagnostics_level
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_UPDATE_1D_ELEM_FIELD" :: UPDATE_1D_ELEM_FIELD
@@ -2006,6 +2083,11 @@ subroutine update_1d_elem_field(ne_field,elem_number,value)
     else
       elem_field(ne_field,elem_number) = value
     endif
+    if(ne_field.eq.ne_radius)then
+      elem_field(ne_radius_in,elem_number) = value
+      elem_field(ne_radius_out,elem_number) = value
+    endif
+
     call enter_exit(sub_name,2)
   end subroutine update_1d_elem_field
  !

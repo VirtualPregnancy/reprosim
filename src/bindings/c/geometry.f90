@@ -45,24 +45,7 @@ contains
 
   end subroutine append_units_c
 
-!
-!###################################################################################
-!
-!*calc_capillary_unit_length:* Calculates the effective length of terminal units
-  subroutine calc_capillary_unit_length_c(num_convolutes,num_generations) &
-      bind(C, name="calc_capillary_unit_length_c")
-    use geometry, only: calc_capillary_unit_length
-    implicit none
 
-    integer, intent(inout) :: num_convolutes,num_generations
-
-#if defined _WIN32 && defined __INTEL_COMPILER
-    call so_calc_capillary_unit_length(num_convolutes,num_generations)
-#else
-    call calc_capillary_unit_length(num_convolutes,num_generations)
-#endif
-
-  end subroutine calc_capillary_unit_length_c
 !
 !###################################################################################
 !
@@ -221,6 +204,35 @@ contains
 #endif
 
     end subroutine define_ven_rad_from_art_c
+
+!
+!#################################################################################
+!
+ subroutine define_capillary_model_c(define_convolutes,define_generations,define_parallel,&
+          define_model,define_model_len) bind(C, name="define_capillary_model_c")
+
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_FILENAME_LEN
+    use geometry, only: define_capillary_model
+    use arrays, only: dp
+    implicit none
+    integer, intent(in) :: define_convolutes,define_generations,define_parallel
+    integer,intent(in) :: define_model_len
+    type(c_ptr), value, intent(in) :: define_model
+    character(len=MAX_FILENAME_LEN) :: define_model_f
+
+    call strncpy(define_model_f, define_model, define_model_len)
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_define_capillary_model(define_convolutes,define_generations,define_parallel,&
+          define_model_f)
+#else
+    call define_capillary_model(define_convolutes,define_generations,define_parallel,&
+          define_model_f)
+#endif
+
+    end subroutine define_capillary_model_c
 !
 !##################################################################################
 !
