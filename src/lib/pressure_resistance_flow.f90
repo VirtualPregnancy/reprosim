@@ -234,7 +234,7 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
          solver_solution(no)=prq_solution(depvar)
       endif
    enddo !mesh_dof
-   if((vessel_type.eq."rigid").and.(rheology_type.eq."constant_visc").and.(capillary_model_type.eq.1))then
+   if((vessel_type.eq."rigid").and.(rheology_type.eq."constant_visc").and.(capillary_model_type.le.1))then
 
      !! ----CALL SOLVER----
      call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
