@@ -456,7 +456,7 @@ depvar_at_elem,prq_solution,mesh_dof,mesh_type)
   end subroutine boundary_conditions
 
 !
-!####################################################################################
+!#################################################################f_###################
 !
 subroutine calculate_radius(depvar_at_node,prq_solution,mesh_dof,elastance)
     use arrays,only: dp,num_nodes,num_elems,elem_nodes,elem_field
@@ -531,9 +531,11 @@ subroutine calculate_resistance(viscosity,mesh_type)
        ! element Poiseuille (laminar) resistance in units of Pa.s.mm-3   '
        resistance = 8.0_dp*viscosity*elem_field(ne_viscfact,ne)*elem_field(ne_length,ne)/ &
             (PI*radius**4.0_dp) !laminar resistance
+
        elem_field(ne_resist,ne) = resistance
        if(diagnostics_level.GT.1)then
-       		print *,"TESTING RESISTANCE: element",ne,"resistance",elem_field(ne_resist,ne),"radius",elem_field(ne_radius,ne)
+       		print *,"TESTING RESISTANCE: element",ne,"resistance",elem_field(ne_resist,ne),"radius",elem_field(ne_radius,ne),&
+                    "length",elem_field(ne_length,ne)
        endif
 
     enddo
@@ -609,29 +611,30 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
 
-
+  !Output level == 2 then we have no capillaries
   !calculate arterial vascular volume
    arterial_vasc_volume = 0.0_dp
    arterial_surface_area = 0.0_dp
-   arteriole_vasc_volume = 0.0_dp
-   arteriole_surface_area = 0.0_dp
-   cap_vasc_volume = 0.0_dp
-   cap_surface_area = 0.0_dp
-   venule_vasc_volume = 0.0_dp
-   venule_surface_area = 0.0_dp
-   vein_vasc_volume = 0.0_dp
-   vein_surface_area = 0.0_dp
-   sum_cap_resistance = 0.0_dp
-   sum_terminal_lengths = 0.0_dp
-   mean_terminal_flow = 0.0_dp
-
+   if (output_level.eq.1)then
+       arteriole_vasc_volume = 0.0_dp
+       arteriole_surface_area = 0.0_dp
+       cap_vasc_volume = 0.0_dp
+       cap_surface_area = 0.0_dp
+       venule_vasc_volume = 0.0_dp
+       venule_surface_area = 0.0_dp
+       vein_vasc_volume = 0.0_dp
+       vein_surface_area = 0.0_dp
+       sum_cap_resistance = 0.0_dp
+       sum_terminal_lengths = 0.0_dp
+       mean_terminal_flow = 0.0_dp
+   endif
    do ne=1,num_elems
        !RADIUS IS AVERAGE OF THE TWO RADII
        radius = (elem_field(ne_radius_in,ne)+elem_field(ne_radius_out,ne))/2.0_dp
       if(elem_field(ne_group,ne).eq.0)then
         arterial_vasc_volume = arterial_vasc_volume + PI*radius**2.0_dp*elem_field(ne_length, ne)
         arterial_surface_area = arterial_surface_area  + PI* 2.0_dp*radius*elem_field(ne_length, ne)
-      else if(elem_field(ne_group,ne).eq.1)then
+      else if((elem_field(ne_group,ne).eq.1).and.(output_level.eq.1))then
          arteriole_vasc_volume = arteriole_vasc_volume + elem_field(ne_artvol,ne)
       	 arteriole_surface_area = arteriole_surface_area  + elem_field(ne_artsa,ne)
          cap_vasc_volume = cap_vasc_volume + elem_field(ne_vol,ne)
@@ -644,7 +647,7 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
          end if
          mean_terminal_flow = mean_terminal_flow + elem_field(ne_Qdot,ne)
 
-      else if(elem_field(ne_group,ne).eq.2)then
+      else if((elem_field(ne_group,ne).eq.2).and.(output_level.eq.1))then
         vein_vasc_volume = vein_vasc_volume + PI*radius**2.0_dp*elem_field(ne_length, ne)
         vein_surface_area = vein_surface_area  + PI* 2.0_dp*radius*elem_field(ne_length, ne)
       else
@@ -658,28 +661,29 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
    print*, "Arterial surface area (cm**2) = ", arterial_surface_area/100.0_dp
    print*, "Arterial surface area (m**2) = ", arterial_surface_area/(100.0_dp*10000.0_dp)
    print *, "##########################    ARTERIES   #########################"
-   print *, "###########################  ARTERIOLE  ###########################"
-   print *, "Arteriole vascular volume (cm**3/ml) = ",arteriole_vasc_volume/1000.0_dp !mm3 to cm3
-   print*, "Arteriole surface area (cm**3) = ", arteriole_surface_area/100.0_dp
-   print*, "Arteriole surface area (m**3) = ", arteriole_surface_area/(100.0_dp*10000.0_dp)
-   print *, "###########################  ARTERIOLE  ###########################"
-   print *, "##########################   CAPILLARY   ##########################"
-   print *, "Capillary elems count",num_units
-   print *, "Capillary vascular volume (cm**3/ml) = ",cap_vasc_volume/1000.0_dp !mm3 to cm3
-   print*, "Capillary surface area (cm**3) = ", cap_surface_area/100.0_dp
-   print*, "Capillary surface area (m**3) = ", cap_surface_area/(100.0_dp*10000.0_dp)
-   print *, "##########################   CAPILLARY   ##########################"
-   print *, "############################  VENULE  #############################"
-   print *, "Venule vascular volume (cm**3/ml) = ",venule_vasc_volume/1000.0_dp !mm3 to cm3
-   print*, "Venule surface area (cm**3) = ", venule_surface_area/100.0_dp
-   print*, "Venule surface area (m**3) = ", venule_surface_area/(100.0_dp*10000.0_dp)
-   print *, "############################  VENULE  #############################"
-   print *, "###########################   VEINS  #############################"
-   print *, "Vein vascular volume (cm**3/ml) = ",vein_vasc_volume/1000.0_dp !mm3 to cm3
-   print*, "Vein surface area (cm**3) = ", vein_surface_area/100.0_dp
-   print*, "Vein surface area (m**3) = ", vein_surface_area/(100.0_dp*10000.0_dp)
-   print *, "############################   VEINS  #############################"
-
+   if(output_level.eq.1) then
+       print *, "###########################  ARTERIOLE  ###########################"
+       print *, "Arteriole vascular volume (cm**3/ml) = ",arteriole_vasc_volume/1000.0_dp !mm3 to cm3
+       print*, "Arteriole surface area (cm**3) = ", arteriole_surface_area/100.0_dp
+       print*, "Arteriole surface area (m**3) = ", arteriole_surface_area/(100.0_dp*10000.0_dp)
+       print *, "###########################  ARTERIOLE  ###########################"
+       print *, "##########################   CAPILLARY   ##########################"
+       print *, "Capillary elems count",num_units
+       print *, "Capillary vascular volume (cm**3/ml) = ",cap_vasc_volume/1000.0_dp !mm3 to cm3
+       print*, "Capillary surface area (cm**3) = ", cap_surface_area/100.0_dp
+       print*, "Capillary surface area (m**3) = ", cap_surface_area/(100.0_dp*10000.0_dp)
+       print *, "##########################   CAPILLARY   ##########################"
+       print *, "############################  VENULE  #############################"
+       print *, "Venule vascular volume (cm**3/ml) = ",venule_vasc_volume/1000.0_dp !mm3 to cm3
+       print*, "Venule surface area (cm**3) = ", venule_surface_area/100.0_dp
+       print*, "Venule surface area (m**3) = ", venule_surface_area/(100.0_dp*10000.0_dp)
+       print *, "############################  VENULE  #############################"
+       print *, "###########################   VEINS  #############################"
+       print *, "Vein vascular volume (cm**3/ml) = ",vein_vasc_volume/1000.0_dp !mm3 to cm3
+       print*, "Vein surface area (cm**3) = ", vein_surface_area/100.0_dp
+       print*, "Vein surface area (m**3) = ", vein_surface_area/(100.0_dp*10000.0_dp)
+       print *, "############################   VEINS  #############################"
+   endif
 
    !Print capillary convolute number, generations and total length of capillaries
    if(capillary_model_type.eq.1)then
@@ -705,9 +709,8 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
          inlet_pressure = node_field(nj_bv_press,np1)
       endif
    enddo
-
    outlet_pressure = 0.0_dp
-   if(umbilical_outlets(1).GT.0)then
+   if(allocated(umbilical_outlets))then
       outlet_elem = umbilical_outlets(1)
    else !get the first unit
       outlet_elem = units(1)
@@ -716,15 +719,15 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
    np2 = elem_nodes(2,outlet_elem)
    outlet_pressure = node_field(nj_bv_press,np2)
    resistance = (inlet_pressure - outlet_pressure)/inlet_flow
- !  print *, "######################## OVERALL PRESSURE/FLOW #####################"
- !  print *, "Inlet pressure (Pa) =", inlet_pressure
- !  print *, "Inlet pressure (mmHg) = ", inlet_pressure/133.322_dp
- !  print *, "Outlet pressure (Pa) =", outlet_pressure
- !  print *, "Outlet pressure (mmHg) =", outlet_pressure/133.322_dp
- !  print *, "Flow (sum of all inlet flows) (mm3/s) =", inlet_flow
- !  print *, "Flow (sum of all inlet flows) (ml/min) =", inlet_flow * 0.06_dp
- !  print *, "Total vascular resistance (Pin-Pout)/Flow (Pa.s/mm**3) = ",resistance
- !  print *, "######################## OVERALL PRESSURE/FLOW #####################"
+   print *, "######################## OVERALL PRESSURE/FLOW #####################"
+   print *, "Inlet pressure (Pa) =", inlet_pressure
+   print *, "Inlet pressure (mmHg) = ", inlet_pressure/133.322_dp
+   print *, "Outlet pressure (Pa) =", outlet_pressure
+   print *, "Outlet pressure (mmHg) =", outlet_pressure/133.322_dp
+   print *, "Flow (sum of all inlet flows) (mm3/s) =", inlet_flow
+   print *, "Flow (sum of all inlet flows) (ml/min) =", inlet_flow * 0.06_dp
+   print *, "Total vascular resistance (Pin-Pout)/Flow (Pa.s/mm**3) = ",resistance
+   print *, "######################## OVERALL PRESSURE/FLOW #####################"
 
    !mean, min, max and std of branch diameter by Strahler order
    if(output_level.gt.0)then
@@ -758,74 +761,82 @@ subroutine calculate_stats(FLOW_GEN_FILE,image_voxel_size,output_level)
             minval(diameter_by_strahler(order,:),MASK = diameter_by_strahler(order,:) .GT.0),",", &
             maxval(diameter_by_strahler(order,:)),",",std_diameter
      enddo
-
-     !Arterial vessel diameter by Strahler order
-     allocate(art_diameter_by_strahler(max_strahler,num_arterial_elems))
-     art_diameter_by_strahler = 0
-     branch_count = 0
-     do ne=1,num_arterial_elems
-        ne_order = strahler_orders(ne)
-        if(ne_order.ge.1)then
-         no_branches = branch_count(ne_order)
-         no_branches = no_branches + 1
-         art_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-         branch_count(ne_order) = no_branches
-        endif
-     enddo
-     print *, "Arterial vessel diameter (mm) by Strahler order:"
-     print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
-     do order=1, max_strahler
-        mean_diameter = sum(art_diameter_by_strahler(order,:))/branch_count(order)
-        std_diameter = 0
-        do branch=1,branch_count(order)
-          std_diameter = std_diameter + (art_diameter_by_strahler(order,branch) - mean_diameter)**2
-        enddo
-        std_diameter = std_diameter/branch_count(order)
-        std_diameter = SQRT(std_diameter)
-        print *, order,",",branch_count(order),",",mean_diameter,",", &
-           minval(art_diameter_by_strahler(order,:),MASK = art_diameter_by_strahler(order,:) .GT.0),",", &
-            maxval(art_diameter_by_strahler(order,:)),",",std_diameter
-     enddo
-
-     !Venous vessel diameter by Strahler order
-     write(*,*) 'in do'
-     !all elements - arterial elements - number of capillaries (the same as number of terminal units)
-     ven_elems = num_elems-num_arterial_elems-num_units
-     write(*,*) ven_elems,num_elems,num_arterial_elems,num_units,max_strahler
-     if (ven_elems.GT.0)then!checking there are venous elements
-      allocate(ven_diameter_by_strahler(max_strahler,ven_elems))
-      ven_diameter_by_strahler = 0
-      branch_count = 0
-      do ne=num_arterial_elems+1,num_elems
-         if(elem_field(ne_group,ne).eq.2.0_dp)then !vein
+     if(output_level.eq.1)then
+         !Arterial vessel diameter by Strahler order
+         allocate(art_diameter_by_strahler(max_strahler,num_arterial_elems))
+         art_diameter_by_strahler = 0
+         branch_count = 0
+         do ne=1,num_arterial_elems
             ne_order = strahler_orders(ne)
-	    if(ne_order.ge.1)then
-               no_branches = branch_count(ne_order)
-               no_branches = no_branches + 1
-               ven_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
-               branch_count(ne_order) = no_branches
-	    endif
-         endif
-      enddo
-      write(*,*) 'out do'
-      print *, "Venous vessel diameter (mm) by Strahler order:"
-      print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
-      do order=1, max_strahler
-         mean_diameter = sum(ven_diameter_by_strahler(order,:))/branch_count(order)
-         std_diameter = 0
-         do branch=1,branch_count(order)
-            std_diameter = std_diameter + (ven_diameter_by_strahler(order,branch) - mean_diameter)**2
+            if(ne_order.ge.1)then
+             no_branches = branch_count(ne_order)
+             no_branches = no_branches + 1
+             art_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+             branch_count(ne_order) = no_branches
+            endif
          enddo
-         std_diameter = std_diameter/branch_count(order)
-         std_diameter = SQRT(std_diameter)
-         print *, order,",",branch_count(order),",",mean_diameter,",", &
-           minval(ven_diameter_by_strahler(order,:),MASK = ven_diameter_by_strahler(order,:) .GT.0),",", &
-            maxval(ven_diameter_by_strahler(order,:)),",",std_diameter
-      enddo
-     endif !(ven_elems.GT.0)
-   endif!outputlevel
+         print *, "Arterial vessel diameter (mm) by Strahler order:"
+         print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
+         do order=1, max_strahler
+            mean_diameter = sum(art_diameter_by_strahler(order,:))/branch_count(order)
+            std_diameter = 0
+            do branch=1,branch_count(order)
+              std_diameter = std_diameter + (art_diameter_by_strahler(order,branch) - mean_diameter)**2
+            enddo
+            std_diameter = std_diameter/branch_count(order)
+            std_diameter = SQRT(std_diameter)
+            print *, order,",",branch_count(order),",",mean_diameter,",", &
+               minval(art_diameter_by_strahler(order,:),MASK = art_diameter_by_strahler(order,:) .GT.0),",", &
+                maxval(art_diameter_by_strahler(order,:)),",",std_diameter
+         enddo
+
+         !Venous vessel diameter by Strahler order
+         !all elements - arterial elements - number of capillaries (the same as number of terminal units)
+         ven_elems = num_elems-num_arterial_elems-num_units
+         write(*,*) ven_elems,num_elems,num_arterial_elems,num_units,max_strahler
+         if (ven_elems.GT.0)then!checking there are venous elements
+          allocate(ven_diameter_by_strahler(max_strahler,ven_elems))
+          ven_diameter_by_strahler = 0
+          branch_count = 0
+          do ne=num_arterial_elems+1,num_elems
+             if(elem_field(ne_group,ne).eq.2.0_dp)then !vein
+                ne_order = strahler_orders(ne)
+	        if(ne_order.ge.1)then
+                   no_branches = branch_count(ne_order)
+                   no_branches = no_branches + 1
+                   ven_diameter_by_strahler(ne_order,no_branches) = elem_field(ne_radius,ne) * 2
+                   branch_count(ne_order) = no_branches
+	        endif
+             endif
+          enddo
+          print *, "Venous vessel diameter (mm) by Strahler order:"
+          print *, "Strahler_order,number_of_elements,mean_diameter,min_diameter,max_diameter,std"
+          do order=1, max_strahler
+             mean_diameter = sum(ven_diameter_by_strahler(order,:))/branch_count(order)
+             std_diameter = 0
+             do branch=1,branch_count(order)
+                std_diameter = std_diameter + (ven_diameter_by_strahler(order,branch) - mean_diameter)**2
+             enddo
+             std_diameter = std_diameter/branch_count(order)
+             std_diameter = SQRT(std_diameter)
+             print *, order,",",branch_count(order),",",mean_diameter,",", &
+               minval(ven_diameter_by_strahler(order,:),MASK = ven_diameter_by_strahler(order,:) .GT.0),",", &
+                maxval(ven_diameter_by_strahler(order,:)),",",std_diameter
+          enddo
+         endif !(ven_elems.GT.0)
+       endif!outputlevel
+     end if
 
   !coefficient of variation for terminal flow
+   if(output_level.eq.2)then
+       mean_terminal_flow = 0.0_dp
+       do nu=1,num_units
+           ne = units(nu)
+           mean_terminal_flow = mean_terminal_flow + elem_field(ne_Qdot,ne)
+       enddo
+       mean_terminal_flow= mean_terminal_flow/num_units
+
+   end if
    std_terminal_flow = 0
    do nu=1,num_units
       ne = units(nu)
