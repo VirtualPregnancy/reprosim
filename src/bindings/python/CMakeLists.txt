@@ -6,10 +6,7 @@ set(ADDITIONAL_GENERATED_FILES)
 # SWIG has already been found at this point.
 include(${SWIG_USE_FILE})
 
-string(SUBSTRING ${PYTHONLIBS_VERSION_STRING} 0 1 PYTHONLIBS_MAJOR_VERSION)
-if(${PYTHONLIBS_MAJOR_VERSION} STREQUAL "3")
-  set(PYTHONLIBS_SWIG_FLAGS -relativeimport)
-endif()
+set(PYTHONLIBS_SWIG_FLAGS -relativeimport)
 
 set(INTERFACE_SRCS
   ../interface/arrays.i
@@ -21,7 +18,7 @@ set(INTERFACE_SRCS
 
 )
 
-include_directories(${PYTHON_INCLUDE_DIRS} ${NUMPY_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/../c)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../c)
 
 if(MSVC)
   set(PYTHON_PACKAGE_DIR ${CMAKE_CURRENT_BINARY_DIR}/$(Configuration)/reprosim)
@@ -47,7 +44,7 @@ foreach(SWIG_INTERFACE ${INTERFACE_SRCS})
   # so we add the release libraries here for all platforms.  This probably means that
   # when we try and link to the debug version of the Python libraires on OSX and GNU/Linux 
   # we will not succeed.  But as this is rarely done it hopefully won't become an issue.
-  swig_link_libraries(${MODULE_NAME} ${PYTHON_LIBRARY_RELEASE} reprosim_c)
+  swig_link_libraries(${MODULE_NAME} ${PYTHON_LIBRARY_RELEASE} reprosim_c Python::Module Python::NumPy)
   set(MODULE_TARGET ${SWIG_MODULE_${MODULE_NAME}_REAL_NAME})
   set_target_properties(${MODULE_TARGET} PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${PYTHON_PACKAGE_DIR}
