@@ -1,0 +1,3 @@
+[submodule "tests/pFUnit"]
+	path = tests/pFUnit
+	url = https://github.com/Goddard-Fortran-Ecosystem/pFUnit
