@@ -22,6 +22,7 @@ set_target_properties(reprosim_obj PROPERTIES
   POSITION_INDEPENDENT_CODE TRUE)
 
 if (MSVC)
+  target_compile_options(reprosim_obj PUBLIC -fpp)
   # Visual Studio requires a dummy file as it will not build a library from only objects.
   set(dummy_file "${CMAKE_CURRENT_BINARY_DIR}/dummy.f90")
   file(WRITE ${dummy_file} "module dummy
