@@ -1,8 +1,8 @@
 
-add_subdirectory(pFUnit-4.8.0)
+add_subdirectory(pFUnit)
 
 # Include the config file so we can use the test creation function directly.
-include("${CMAKE_CURRENT_BINARY_DIR}/pFUnit-4.8.0/pFUnitConfig.cmake")
+include("${CMAKE_CURRENT_BINARY_DIR}/pFUnit/pFUnitConfig.cmake")
 
 
 add_subdirectory(utils)
