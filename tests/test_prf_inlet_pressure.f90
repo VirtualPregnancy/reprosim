@@ -59,15 +59,14 @@ end subroutine collect_prf_inlet_pressure
     name = "inlet"
     inlet_rad=3.0_dp    
     order_options = "arterial"   
-    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options,"")   
+    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
     !define radius for venous vessels
     order_system = "strahler"
     s_ratio=1.55_dp
     name = ""
     inlet_rad=5.0_dp  
     order_options = "venous"
-    call define_rad_from_geom(order_system, s_ratio, name, &
-                    inlet_rad, order_options,"")
+    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
       
     mesh_type = "full_plus_tube"
     bc_type = "pressure"

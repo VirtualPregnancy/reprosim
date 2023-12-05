@@ -495,7 +495,7 @@ end subroutine collect_geometry
     inlet_rad=3.0_dp    
     order_options = "arterial"
     
-    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options,"")
+    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
     
     !define radius for venous vessels
     order_system = "strahler"
@@ -503,8 +503,8 @@ end subroutine collect_geometry
     name = ""
     inlet_rad=5.0_dp  
     order_options = "venous"
-    call define_rad_from_geom(order_system, s_ratio, name, &
-                    inlet_rad, order_options,"")
+
+    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
   
     call set_elem_radius(test_elem_field)
     
