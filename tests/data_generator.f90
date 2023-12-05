@@ -10,6 +10,7 @@ module test_data
            
 contains
   subroutine write_node_file(NODEFILE)  
+    !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_WRITE_NODE_FILE" :: WRITE_NODE_FILE
     use other_consts, only: MAX_FILENAME_LEN
     character(len=MAX_FILENAME_LEN), intent(out) :: NODEFILE
     NODEFILE = "test.ipnode"
@@ -59,6 +60,7 @@ contains
   end subroutine write_node_file
 
   subroutine delete_node_file(NODEFILE)
+    !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_DELETE_NODE_FILE" :: DELETE_NODE_FILE
     use other_consts, only: MAX_FILENAME_LEN 
     character(len=MAX_FILENAME_LEN), intent(out) :: NODEFILE  
     NODEFILE = "test.ipnode"
@@ -67,6 +69,7 @@ contains
   end subroutine delete_node_file
    
   subroutine write_elem_file(ELEMFILE)
+    !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_WRITE_ELEM_FILE" :: WRITE_ELEM_FILE
     use other_consts, only: MAX_FILENAME_LEN
     character(len=MAX_FILENAME_LEN), intent(out) :: ELEMFILE  
     ELEMFILE = "test.ipelem"   
@@ -100,6 +103,7 @@ contains
   end subroutine write_elem_file
   
   subroutine delete_elem_file(ELEMFILE)
+    !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_DELETE_ELEM_FILE" :: DELETE_ELEM_FILE
     use other_consts, only: MAX_FILENAME_LEN
     character(len=MAX_FILENAME_LEN), intent(out) :: ELEMFILE  
     ELEMFILE = "test.ipelem"   
