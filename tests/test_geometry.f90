@@ -98,7 +98,7 @@ end subroutine collect_geometry
       use geometry,only: define_1d_elements, define_node_geometry
       use indices, only: ne_length,num_ord,perfusion_indices
       use other_consts, only: MAX_FILENAME_LEN
-      use test_data, only: write_elem_file,delete_elem_file, write_node_file
+      use test_data, only: write_elem_file,delete_elem_file, write_node_file, delete_node_file
       use diagnostics, only: get_diagnostics_level, set_diagnostics_level
       implicit none
 
@@ -154,6 +154,7 @@ end subroutine collect_geometry
       if (allocated(error)) return
       
       call delete_elem_file(ELEMFILE)
+      call delete_node_file(NODEFILE)
      
    end subroutine test_define_1d_elements
 
