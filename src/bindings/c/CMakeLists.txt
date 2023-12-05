@@ -40,7 +40,7 @@ set_target_properties(reprosim_c_fortran PROPERTIES
 target_include_directories(reprosim_c_fortran PRIVATE $<TARGET_PROPERTY:reprosim_obj,Fortran_MODULE_DIRECTORY>)
 
 if (MSVC)
-  target_compile_options(reprosim_c_fortran PUBLIC -fpp)
+  target_compile_options(reprosim_c_fortran PRIVATE -fpp)
 endif()
 
 add_library(reprosim_c SHARED ${C_C_LIB_SRCS} ${C_LIB_HDRS}) #  reprosim to be replaced with whatever the final name of the code is
