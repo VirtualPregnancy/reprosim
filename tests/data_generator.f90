@@ -55,7 +55,7 @@ contains
     write(10,*) 'The Xj(2) coordinate is [-0.15305E+03]:   50.00'
     write(10,*) 'The number of versions for nj=3 is [1]:  1'
     write(10,*) 'The Xj(3) coordinate is [-0.11340E+03]:   -150.00'
-    close(10)	
+    close(10)
   end subroutine write_node_file
 
   subroutine delete_node_file(NODEFILE)
