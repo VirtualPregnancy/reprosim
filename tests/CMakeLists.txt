@@ -51,6 +51,9 @@ endif ()
 
 if (MSVC)
   target_compile_options("${PROJECT_NAME}-tester" PUBLIC -fpp)
+  set(_REPROSIM_LINK_LIBRARY reprosim_obj)
+else()
+  set(_REPROSIM_LINK_LIBRARY reprosim)
 endif()
 
 set(UTILS_SOURCES data_generator.f90)
@@ -61,7 +64,7 @@ target_link_libraries(utils PRIVATE reprosim)
 target_link_libraries(
   "${PROJECT_NAME}-tester"
   PRIVATE
-  reprosim
+  ${_REPROSIM_LINK_LIBRARY} 
   utils
 )
 

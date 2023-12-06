@@ -16,11 +16,12 @@ contains
   !*Description:* Prints the subroutine name
     use other_consts, only: MAX_SUBNAME_LEN
     implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ENTER_EXIT" :: ENTER_EXIT
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ENTER_EXIT" :: ENTER_EXIT
+ 
     integer,intent(in) :: state
     character(len=MAX_SUBNAME_LEN), intent(in) :: sub_name
 
-	!print *,"diagnostics_level=",diagnostics_level
+    !print *,"diagnostics_level=",diagnostics_level
 
     if(diagnostics_level.GE.1)then
       if(state.eq.1)then
@@ -37,6 +38,7 @@ contains
   subroutine get_diagnostics_level(level)
 
     implicit none
+    !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_GET_DIAGNOSTICS_LEVEL":: GET_DIAGNOSTICS_LEVEL
 
     integer :: level
 
@@ -49,7 +51,8 @@ contains
   subroutine set_diagnostics_level(level)
   
     implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_SET_DIAGNOSTICS_LEVEL":: SET_DIAGNOSTICS_LEVEL
+    !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_SET_DIAGNOSTICS_LEVEL":: SET_DIAGNOSTICS_LEVEL
+
     integer, intent(in) :: level
 
     diagnostics_level = level

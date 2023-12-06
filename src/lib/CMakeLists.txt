@@ -36,6 +36,7 @@ add_library(reprosim $<TARGET_OBJECTS:reprosim_obj> ${dummy_file})
 
 set_target_properties(reprosim PROPERTIES
   Fortran_VISIBILITY_PRESET hidden
+  Fortran_MODULE_DIRECTORY "${REPROSIM_MODULE_DIRECTORY}"
   C_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN 1)
 
