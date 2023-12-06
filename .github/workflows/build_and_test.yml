@@ -230,7 +230,7 @@ jobs:
         fi
 
         cd build-reprosim
-        ctest
+        ctest --output-on-failure
 
         #${{ steps.create-venv.outputs.python_exe }} $GITHUB_WORKSPACE/reprosim/.github/scripts/diagnostics_test.py
         
