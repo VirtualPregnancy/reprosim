@@ -14,7 +14,7 @@ env:
 jobs:
   pipeline:
     name: ${{ matrix.config.name }}
-    if: github.repository == 'virtualpregnancy/reprosim'
+#    if: github.repository == 'virtualpregnancy/reprosim'
     runs-on: ${{ matrix.config.os }}
     strategy:
       fail-fast: false
