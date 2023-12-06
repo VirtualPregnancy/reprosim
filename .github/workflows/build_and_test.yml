@@ -113,7 +113,7 @@ jobs:
       id: setup-fortran-win
       if: runner.os == 'Windows'
       shell: bash
-      working-directory: lungsim
+      working-directory: reprosim
       run: |
         latest_version=`.github/scripts/oneapi-env-vars-location.bat`
         echo "ifort compiler: $latest_version"
@@ -218,7 +218,7 @@ jobs:
         fi
         
         ${{ steps.create-venv.outputs.pip_exe }} install wheel
-        ${{ steps.create-venv.outputs.pip_exe }} install $GITHUB_WORKSPACE/build-lungsim/src/bindings/python$multi_config_dir
+        ${{ steps.create-venv.outputs.pip_exe }} install $GITHUB_WORKSPACE/build-reprosim/src/bindings/python$multi_config_dir
         
         if [ "${{ runner.os }}" == "Windows" ]; then
           # Horrible hack for GitHub actions Windows virtual machine.
@@ -232,7 +232,7 @@ jobs:
         cd build-reprosim
         ctest
 
-        #${{ steps.create-venv.outputs.python_exe }} $GITHUB_WORKSPACE/lungsim/.github/scripts/diagnostics_test.py
+        #${{ steps.create-venv.outputs.python_exe }} $GITHUB_WORKSPACE/reprosim/.github/scripts/diagnostics_test.py
         
         #exit $?
 
