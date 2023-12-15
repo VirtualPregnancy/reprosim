@@ -13,7 +13,7 @@ subroutine collect_geometry(testsuite)
   !> Collection of tests
   type(unittest_type), allocatable, intent(out) :: testsuite(:)
   testsuite = [ &
-    new_unittest("test_define_1d_elements", test_define_1d_elements), &
+    new_unittest("test_define_1d_element_placenta", test_define_1d_element_placenta), &
     new_unittest("test_define_rad_from_geom", test_define_rad_from_geom), &
     new_unittest("test_add_matching_mesh", test_add_matching_mesh), &
     new_unittest("test_append_units", test_append_units), &
@@ -92,10 +92,10 @@ end subroutine collect_geometry
 
 !***************************************************
 
-   subroutine test_define_1d_elements(error)
+   subroutine test_define_1d_element_placenta(error)
       use arrays,only: dp,num_elems,elem_nodes,elems_at_node,elem_cnct, &
            num_nodes,node_xyz,nodes,elem_field,elem_direction,elem_ordrs,maxgen
-      use geometry,only: define_1d_elements, define_node_geometry
+      use geometry,only: define_1d_element_placenta, define_node_geometry
       use indices, only: ne_length,num_ord,perfusion_indices
       use other_consts, only: MAX_FILENAME_LEN
       use test_data, only: write_elem_file,delete_elem_file, write_node_file, delete_node_file
@@ -119,9 +119,9 @@ end subroutine collect_geometry
       call write_elem_file(ELEMFILE)
           
       call define_node_geometry(NODEFILE)
-      call define_1d_elements(ELEMFILE)
+      call define_1d_element_placenta(ELEMFILE)
      
-      !populate test variables - variables populated by sub define_1d_elements
+      !populate test variables - variables populated by sub define_1d_element_placenta
       call set_elem_nodes(test_elem_nodes)
       call set_elems_at_node(test_elems_at_node)
       call set_elem_cnct(test_elem_cnct)  
@@ -156,7 +156,7 @@ end subroutine collect_geometry
       call delete_elem_file(ELEMFILE)
       call delete_node_file(NODEFILE)
      
-   end subroutine test_define_1d_elements
+   end subroutine test_define_1d_element_placenta
 
 ! subroutines to populate test data 
   

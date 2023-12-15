@@ -22,7 +22,7 @@ end subroutine collect_prf_inlet_pressure
                       num_units,unit_field 
     use indices, only: ne_Qdot,nj_bv_press,nu_perf,nu_blood_press,perfusion_indices
     use other_consts, only: MAX_FILENAME_LEN
-    use geometry, only: define_node_geometry,define_1d_elements,append_units, &
+    use geometry, only: define_node_geometry,define_1d_element_placenta,append_units, &
                         add_matching_mesh,define_rad_from_geom
     use pressure_resistance_flow, only: evaluate_prq
     use test_data
@@ -47,7 +47,7 @@ end subroutine collect_prf_inlet_pressure
     call delete_node_file(NODEFILE) 
     ELEMFILE = ""
     call write_elem_file(ELEMFILE)          
-    call define_1d_elements(ELEMFILE)
+    call define_1d_element_placenta(ELEMFILE)
     call delete_elem_file(ELEMFILE)
     call append_units()
     umbilical_elem_option = "same_as_arterial"

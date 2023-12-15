@@ -18,7 +18,7 @@ module pressure_resistance_flow
 
   !Interfaces
   private
-  public evaluate_prq, calculate_stats
+  public evaluate_prq, calculate_stats,tree_resistance,calculate_resistance,capillary_resistance
 contains
 !###################################################################################
 !
@@ -1751,7 +1751,11 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
       nart = elem_cnct(-1,1,nelem) !capillary unit is downstream of a terminal unit
       nv =  elem_cnct(1,1,nelem) !vein is downstream of the capillary
       int_rad_ain= elem_field(ne_radius,nart) !mm Unstrained radius of inlet villous
-      int_rad_vin = elem_field(ne_radius,nv) !mm radius of ouutlet intermediate villous
+      if(nv.gt.0)then
+        int_rad_vin = elem_field(ne_radius,nv) !mm radius of ouutlet intermediate villous
+      else
+        int_rad_vin = elem_field(ne_radius,nart)*2.0_dp !mm radius of ouutlet intermediate villous
+      end if
       int_rad_aout =  0.03_dp/2.0_dp ! mm radius of mature intermediate villous artery
       int_rad_vout = 0.03
 
