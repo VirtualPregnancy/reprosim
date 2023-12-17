@@ -7,12 +7,16 @@ contains
 
 !
 !> Perfusion fetal
-  subroutine fetal_model_c(dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,RvRv,&
+  subroutine fetal_model_c(OUTDIR,filename_len,dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,RvRv,&
           U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A) bind(C, name="fetal_model_c")
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
     use arrays, only: dp
+    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
     use fetal, only: fetal_model
     implicit none
 
+    type(c_ptr), value, intent(in) :: OUTDIR
     real(dp), intent(in) :: dt
     integer, intent(in) :: num_heart_beats
     real(dp), intent(in) :: T_beat
@@ -30,11 +34,17 @@ contains
     real(dp),  intent(in) :: U0A
     real(dp), intent(in) :: V0V
     real(dp), intent(in) :: V0A
+    integer,intent(in) :: filename_len
+    character(len=MAX_FILENAME_LEN) :: filename_f
+
+    call strncpy(filename_f, OUTDIR, filename_len)
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_fetal_model(dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,RvRv,U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A)
+    call so_fetal_model(filename_f,dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,&
+            RvRv,U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A)
 #else
-    call fetal_model(dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,RvRv,U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A)
+    call fetal_model(filename_f,dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,RvRv,&
+            U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A)
 #endif
 
   end subroutine fetal_model_c
