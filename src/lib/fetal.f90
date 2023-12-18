@@ -73,7 +73,7 @@ contains
 
         real(dp) :: Avent !Ventricular activation (no units)
         real(dp) :: Aatria !Atrial activation (no units)
-        real(dp) :: dpress,Pgrad,Qnod,Qnew,dQ,Vnod,press
+        real(dp) :: dpress,Pgrad,Qnod,dQ,Vnod,press
         real(dp) :: art_resistance,ven_resistance,total_volume
         character(len=60) :: mesh_type
         logical :: continue
@@ -197,7 +197,7 @@ contains
                 node_field_fetal(njf_press,20), node_field_fetal(njf_press,21),node_field_fetal(njf_press,22),&
                 node_field_fetal(njf_press,23)
 
-        WRITE(30,'(26(F15.4,X,","),(F15.4,X)))')&
+        WRITE(30,'(26(F15.4,X,","),(F15.4,X))')&
                 time, ttime,Avent,Aatria,node_field_fetal(njf_netQ,1),&
                         node_field_fetal(njf_netQ,2), node_field_fetal(njf_netQ,3),node_field_fetal(njf_netQ,4),&
                 node_field_fetal(njf_netQ,5), node_field_fetal(njf_netQ,6),node_field_fetal(njf_netQ,7),&
@@ -537,44 +537,41 @@ subroutine compartment_pressure_step(dpress,dt,comp,Q,V)
 
     end subroutine compartment_pressure_step
 
-subroutine one_way_valve(dt,dQ,Q,Pgrad, R, K, L)
-        use diagnostics, only: enter_exit,get_diagnostics_level
-
-    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ONE_WAY_VALVE :: ONE_WAY_VALVE
-        real(dp), intent(in) :: dt
-        real(dp), intent(inout) :: dQ
-        real(dp), intent(inout) :: Q
-        real(dp), intent(in) :: Pgrad
-        real(dp), intent(in) :: R
-        real(dp), intent(in) :: K
-        real(dp), intent(in) :: L
-
-        real(dp) :: check_sign
-        character(len=60) :: sub_name
-        integer :: diagnostics_level
-
-        !------
-        sub_name = 'one_way_valve'
-        call enter_exit(sub_name,1)
-        call get_diagnostics_level(diagnostics_level)
-        if(L.gt.0)then
-            dQ = dt*(Pgrad-K*Q**2.0_dp)/L
-            Q = Q+dQ
-        else
-            if(Pgrad.gt.0) then
-                Q = sqrt(Pgrad/K)
-            else
-                Q = -1.0_dp* sqrt(abs(Pgrad)/K)
-            end if
-        end if
-        if(Q.lt.0.0_dp)then
-            Q=0.0_dp
-        end if
-
-
-        call enter_exit(sub_name,2)
-
-    end subroutine one_way_valve
+!subroutine one_way_valve(dt,dQ,Q,Pgrad, R, K, L)
+!        use diagnostics, only: enter_exit,get_diagnostics_level
+!
+!    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ONE_WAY_VALVE :: ONE_WAY_VALVE
+!        real(dp), intent(in) :: dt
+!        real(dp), intent(inout) :: dQ
+!        real(dp), intent(inout) :: Q
+!        real(dp), intent(in) :: Pgrad
+!        real(dp), intent(in) :: R
+!        real(dp), intent(in) :: K
+!        real(dp), intent(in) :: L
+!
+!        real(dp) :: check_sign
+!        character(len=60) :: sub_name
+!        integer :: diagnostics_level
+!
+!        !------
+!        sub_name = 'one_way_valve'
+!        call enter_exit(sub_name,1)
+!        call get_diagnostics_level(diagnostics_level)
+!        if(L.gt.0)then
+!            dQ = dt*(Pgrad-K*Q**2.0_dp)/L
+!            Q = Q+dQ
+!        else
+!            if(Pgrad.gt.0) then
+!                Q = sqrt(Pgrad/K)
+!            else
+!                Q = -1.0_dp* sqrt(abs(Pgrad)/K)
+!            end if
+!        end if
+!        if(Q.lt.0.0_dp)then
+!            Q=0.0_dp
+!        end if
+!        call enter_exit(sub_name,2)
+!    end subroutine one_way_valve
 
     subroutine rq_unit(dt,Q,Pgrad, R)
         use diagnostics, only: enter_exit,get_diagnostics_level

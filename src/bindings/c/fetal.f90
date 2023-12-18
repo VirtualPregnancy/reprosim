@@ -12,7 +12,7 @@ contains
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
     use arrays, only: dp
-    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
+    use other_consts, only: MAX_FILENAME_LEN
     use fetal, only: fetal_model
     implicit none
 
