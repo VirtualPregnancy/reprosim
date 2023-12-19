@@ -57,9 +57,9 @@ contains
     implicit none
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_assign_fetal_arrays()
+    call so_assign_fetal_arrays
 #else
-    call assign_fetal_arrays()
+    call assign_fetal_arrays
 #endif
 
   end subroutine assign_fetal_arrays_c
