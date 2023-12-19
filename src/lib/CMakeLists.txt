@@ -3,7 +3,9 @@
 set(LIB_SRCS
   arrays.f90
   diagnostics.f90
+  fetal.f90
   geometry.f90
+  imports.f90
   indices.f90
   math_utilities.f90
   other_consts.f90

@@ -6,7 +6,8 @@
 extern void add_matching_mesh_c(const char *umbilical_elem_option, int *umbilical_elem_option_len, int umbilical_element_numbers[], int *umbilical_element_numbers_len);
 void append_units_c();
 void create_anastomosis_c(int *node_in, int *node_out, double *anast_radius);
-void define_1d_elements_c(const char *ELEMFILE, int *filename_len, int *anastomosis_elem_in);
+void define_1d_element_geometry_c(const char *ELEMFILE, int *filename_len);
+void define_1d_element_placenta_c(const char *ELEMFILE, int *filename_len, int *anastomosis_elem_in);
 void define_node_geometry_c(const char *NODEFILE, int *filename_len);
 void define_rad_from_file_c(const char *FIELDFILE, int *filename_len, const char *order_system, 
                             int *order_system_len, double *s_ratio);
@@ -37,12 +38,18 @@ void create_anastomosis(int node_in, int node_out, double anast_radius)
   create_anastomosis_c(&node_in, &node_out, &anast_radius);
 }
 
-
-void define_1d_elements(const char *ELEMFILE,int anastomosis_elem_in)
+void define_1d_element_geometry(const char *ELEMFILE)
 {
   int filename_len = strlen(ELEMFILE);
-  define_1d_elements_c(ELEMFILE, &filename_len, &anastomosis_elem_in);
+  define_1d_element_geometry_c(ELEMFILE, &filename_len);
 }
+
+void define_1d_element_placenta(const char *ELEMFILE,int anastomosis_elem_in)
+{
+  int filename_len = strlen(ELEMFILE);
+  define_1d_element_placenta_c(ELEMFILE, &filename_len, &anastomosis_elem_in);
+}
+
 
 void define_node_geometry(const char *NODEFILE)
 {

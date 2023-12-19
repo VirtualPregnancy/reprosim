@@ -16,7 +16,8 @@ module geometry
   public append_units
   public calc_capillary_unit_length
   public create_anastomosis
-  public define_1d_elements
+  public define_1d_element_geometry
+  public define_1d_element_placenta
   public define_node_geometry
   public define_rad_from_file
   public define_rad_from_geom
@@ -206,10 +207,19 @@ contains
       print *, 'Original number of nodes ', num_nodes, ' elements ',num_elems
       print *, 'New number of nodes ', num_nodes_new, ' elements ',num_elems_new
     endif
+    if(allocated(np_map))then !increasing the array size; just overwrite
+       deallocate(np_map)
+    end if
     allocate(np_map(num_nodes))
     np_map = 0
+    if(allocated(ne_map))then !increasing the array size; just overwrite
+       deallocate(ne_map)
+    end if
     allocate(ne_map(num_elems))
     ne_map = 0
+    if(allocated(art_ven_elem_map))then !increasing the array size; just overwrite
+       deallocate(art_ven_elem_map)
+    end if
     allocate(art_ven_elem_map(num_elems))
     !!! increase the size of node and element arrays to accommodate the additional elements
     call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
@@ -217,6 +227,9 @@ contains
     ne_global = num_elems ! assumes this is the highest element number (!!!)
     np0 = num_nodes ! the starting local node number
     np_global = num_nodes ! assumes this is the highest node number (!!!)
+    if(allocated(umbilical_outlets))then
+        deallocate(umbilical_outlets)
+    end if
     allocate(umbilical_outlets(num_inlets))
     umbilical_outlets = 0    
     if(umbilical_elem_option.EQ.'single_umbilical_vein')then
@@ -719,6 +732,7 @@ subroutine define_capillary_model(define_convolutes,define_generations,define_pa
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
 
+
     num_convolutes = define_convolutes
     num_generations = define_generations
     num_parallel = define_parallel
@@ -788,11 +802,17 @@ end subroutine define_capillary_model
       print *, "num_convolutes=",num_convolutes
       print *, "num_generations=",num_generations
     endif
-
+    if(allocated(resistance))then
+        deallocate(resistance)
+    end if
     allocate (resistance(num_convolutes+1), STAT = AllocateStatus)
     if (AllocateStatus /= 0)then
        STOP "*** Not enough memory for resistance array ***"
     endif
+
+    if(allocated(is_capillary_unit))then
+        deallocate(is_capillary_unit)
+    end if
 
     allocate(is_capillary_unit(num_elems), STAT = AllocateStatus)
     if (AllocateStatus /= 0)then
@@ -1014,7 +1034,106 @@ end subroutine define_capillary_model
 !
 !###################################################################################
 !
-  subroutine define_1d_elements(ELEMFILE,anastomosis_elem_in)
+ subroutine define_1d_element_geometry(ELEMFILE)
+ !*Description:* Reads in an element ipelem file to define a geometry
+   use arrays,only: dp, elem_direction,elem_field,elems,elem_cnct,elem_nodes,&
+        elems_at_node,num_elems,num_nodes
+   use indices
+   use diagnostics, only: enter_exit,get_diagnostics_level
+   implicit none
+ !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_1D_ELEMENT_GEOMETRY" :: DEFINE_1D_ELEMENT_GEOMETRY
+
+   character(len=MAX_FILENAME_LEN), intent(in) :: ELEMFILE
+   !     Local Variables
+   integer :: ibeg,iend,ierror,i_ss_end,j,ne,ne_global,&
+        nn,np,np1,np2,np_global,inlet_counter,umbilical_inlets_temp(100)
+   character(LEN=132) :: ctemp1
+   character(LEN=40) :: sub_string
+   character(len=60) :: sub_name
+   integer :: diagnostics_level
+
+   sub_name = 'define_1d_element_geometry'
+   call enter_exit(sub_name,1)
+   call get_diagnostics_level(diagnostics_level)
+
+   open(10, file=ELEMFILE, status='old')
+
+   read_number_of_elements : do
+      read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+      if(index(ctemp1, "elements")> 0) then
+         call get_final_integer(ctemp1,num_elems)
+         if(diagnostics_level.GT.1)then
+         	print *, "num_elems", num_elems
+         endif
+         exit read_number_of_elements
+      endif
+   end do read_number_of_elements
+
+   !!! allocate memory for element arrays
+   if(allocated(elems)) deallocate(elems) !Array that defines nodal connections between elements
+   allocate(elems(num_elems))
+   if(allocated(elem_cnct)) deallocate(elem_cnct) !Array that defines connections between elements
+   allocate(elem_cnct(-1:1,0:10,0:num_elems))!Allows up to 10 elements per node
+   if(allocated(elem_nodes)) deallocate(elem_nodes)
+   allocate(elem_nodes(2,num_elems)) !defines in and out nodes at each element
+   if(allocated(elems_at_node)) deallocate(elems_at_node)
+   allocate(elems_at_node(num_nodes,0:10)) !Allows up to 10 elements per node
+   if(allocated(elem_field)) deallocate(elem_field)
+   allocate(elem_field(num_ne,num_elems))
+   if(allocated(elem_direction)) deallocate(elem_direction)
+   allocate(elem_direction(3,num_elems))
+
+   !!! initialise element arrays
+   elems=0
+   elem_nodes=0
+   elem_field = 0.0_dp
+
+   ne=0
+   !each element has 2 nodes in 1D tree this is defined in array elem_nodes: elem_nodes (1,element_number ne) = node np"
+   read_an_element : do
+      !.......read element number
+      read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+      if(index(ctemp1, "Element")> 0) then
+         call get_final_integer(ctemp1,ne_global) !get element number
+         ne=ne+1
+         elems(ne)=ne_global
+            read_element_nodes : do
+            read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+            if(index(ctemp1, "global")> 0) then !found the correct line
+               iend=len(ctemp1)
+               ibeg=index(ctemp1,":")+1 !get location of first integer in string
+               sub_string = adjustl(ctemp1(ibeg:iend)) ! get the characters beyond : remove leading blanks
+               i_ss_end=len(sub_string) !get the end location of the sub-string
+               ibeg=1
+               do nn=1,2
+                  iend=index(sub_string," ") !get location of first blank in sub-string
+                  read (sub_string(ibeg:iend-1), '(i7)' ) np_global
+                  call get_local_node(np_global,np) ! get local node np for global node
+                  elem_nodes(nn,ne)=np ! the local node number, not global
+                  if(diagnostics_level.GT.1)then
+                  		print *,"elem_nodes(nn,ne)", nn, ne, "= np", np
+                  endif
+                  sub_string = adjustl(sub_string(iend:i_ss_end)) ! get chars beyond blank, remove leading blanks
+               end do
+               exit read_element_nodes
+            endif !index
+         end do read_element_nodes
+         if(ne.ge.num_elems) exit read_an_element
+      endif
+
+   end do read_an_element
+
+   close(10)
+
+   call element_connectivity_1d_general
+
+   call enter_exit(sub_name,2)
+
+ END subroutine define_1d_element_geometry
+!
+!###################################################################################
+!
+  subroutine define_1d_element_placenta(ELEMFILE,anastomosis_elem_in)
   !*Description:* Reads in an element ipelem file to define a geometry
     use arrays,only: dp, elem_direction,elem_field,elems,elem_cnct,elem_nodes,&
          elem_ordrs,elem_symmetry,elems_at_node,elem_units_below,&
@@ -1023,7 +1142,7 @@ end subroutine define_capillary_model
     use indices
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_1D_ELEMENTS" :: DEFINE_1D_ELEMENTS
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEFINE_1D_ELEMENT_PLACENTA" :: DEFINE_1D_ELEMENT_PLACENTA
 
     character(len=MAX_FILENAME_LEN), intent(in) :: ELEMFILE
     integer, optional :: anastomosis_elem_in
@@ -1035,7 +1154,7 @@ end subroutine define_capillary_model
     character(len=60) :: sub_name
     integer :: diagnostics_level
 
-    sub_name = 'define_1d_elements'
+    sub_name = 'define_1d_element_placenta'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
 
@@ -1122,6 +1241,8 @@ end subroutine define_capillary_model
 
     close(10)
 
+    call element_connectivity_1d
+
     ! calculate the element lengths and directions
     do ne=1,num_elems
        np1=elem_nodes(1,ne)
@@ -1167,7 +1288,7 @@ end subroutine define_capillary_model
 
     call enter_exit(sub_name,2)
 
-  END subroutine define_1d_elements
+  END subroutine define_1d_element_placenta
 
 !
 !###################################################################################
@@ -1798,6 +1919,114 @@ end subroutine define_capillary_model
     call enter_exit(sub_name,2)
 
   END subroutine element_connectivity_1d
+
+ subroutine element_connectivity_1d_general
+ !*Description:* Calculates element connectivity in 1D and stores in elem_cnct
+   use arrays,only: elem_cnct,elem_nodes,elems_at_node,num_elems,num_nodes!,elem_cnct_no_anast,&
+                   ! anastomosis_elem
+   use diagnostics, only: enter_exit,get_diagnostics_level
+   implicit none
+ !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ELEMENT_CONNECTIVITY_1D_GENERAL" :: ELEMENT_CONNECTIVITY_1D_GENERAL
+   !     Local Variables
+   integer :: ne,ne2,nn,noelem,np,np2,np1,counter,orphan_counter,np2_1
+   integer,parameter :: NNT=2
+   character(len=60) :: sub_name
+   integer :: orphan_nodes(num_nodes)
+   integer :: diagnostics_level
+
+   sub_name = 'element_connectivity_1d_general'
+   call enter_exit(sub_name,1)
+   call get_diagnostics_level(diagnostics_level)
+
+   ! calculate elems_at_node array: stores the elements that nodes are in
+   ! elems_at_node(node np,0)= total number of elements connected to this node
+   ! elems_at_node(node np, index of each connected element starting at 1) = connected element
+   elems_at_node = 0 !initialise
+   DO ne=1,num_elems
+      DO nn=1,2
+         np=elem_nodes(nn,ne)
+         elems_at_node(np,0)=elems_at_node(np,0)+1
+         elems_at_node(np,elems_at_node(np,0))=ne ! local element that np is in
+       ENDDO !nn
+   ENDDO !noelem
+
+   if(diagnostics_level.GT.1)then
+   		DO nn=1,num_nodes
+      		print *," "
+      		print *,"node",nn
+      		print *,"total number of elements connected",elems_at_node(nn,0)
+      		DO ne=1,elems_at_node(nn,0)
+         		print *,"element",elems_at_node(nn,ne)
+      		ENDDO
+   		ENDDO
+   endif
+
+   !check for nodes with 0 elements exit if any are found
+   orphan_counter = 0
+   DO nn=1,num_nodes
+		if(elems_at_node(nn,0).EQ.0)then
+			orphan_counter = orphan_counter + 1
+			orphan_nodes(orphan_counter) = nn
+		endif
+   ENDDO
+   if(orphan_counter.GT.0)then
+		print *, "found",orphan_counter,"node(s) not connected to any elements"
+		do counter=1,orphan_counter
+			print *,"node",orphan_nodes(counter),"is not connected to any elements"
+		enddo
+		call exit(0)
+   endif
+
+   elem_cnct=0 !initialise all elem_cnct
+
+   DO ne=1,num_elems
+      IF(NNT == 2) THEN !1d
+         np1=elem_nodes(1,ne) !first local node
+         np2=elem_nodes(2,ne) !second local node
+         DO noelem=1,elems_at_node(np2,0) !for each element connected to node np2
+            ne2=elems_at_node(np2,noelem) !get the element number connected to node np2
+            IF(ne2 /= ne)THEN !if element connected to node np2 is not the current element ne
+               !check that the second node of the current element is the first node of ne2
+               np2_1 = elem_nodes(1,ne2)
+               if(np2.EQ.np2_1)then
+                  elem_cnct(-1,0,ne2)=elem_cnct(-1,0,ne2)+1
+                  elem_cnct(-1,elem_cnct(-1,0,ne2),ne2)=ne !previous element
+                  elem_cnct(1,0,ne)=elem_cnct(1,0,ne)+1
+                  elem_cnct(1,elem_cnct(1,0,ne),ne)=ne2
+               endif
+            ENDIF !ne2
+         ENDDO !noelem2
+
+
+      ENDIF
+   ENDDO
+
+	! total count of upstream elements connected to element ne elem_cnct(-1,0,ne)
+	! upstream elements elem_cnct(-1,counter,ne)
+	! total count of downstream elements connected to element ne elem_cnct(1,0,ne)
+	! downstream elements elem_cnct(1,counter,ne)
+   if(diagnostics_level.GT.1)then
+  		DO ne=1,num_elems
+  	    		print *,""
+  	    		print *,"element",ne
+      		IF(elem_cnct(-1,0,ne).gt.0)THEN
+      	    		print *,"total number of upstream elements:",elem_cnct(-1,0,ne)
+      			DO counter=1,elem_cnct(-1,0,ne)
+         			print *,"upstream element",elem_cnct(-1,counter,ne)
+      	    		ENDDO
+      		ENDIF
+      		IF(elem_cnct(1,0,ne).gt.0)THEN
+      	    		print *,"total number of downstream elements:",elem_cnct(1,0,ne)
+      			DO counter=1,elem_cnct(1,0,ne)
+         			print *,"downstream element",elem_cnct(1,counter,ne)
+      	    		ENDDO
+      		ENDIF
+   		ENDDO
+   endif
+
+   call enter_exit(sub_name,2)
+
+ END subroutine element_connectivity_1d_general
 !
 !###################################################################################
 !

@@ -31,7 +31,8 @@
 
 // define_rad_from_file has an optional argument that C cannot replicate,
 // so we use SWIG to override with a C++ version that can.
-void define_1d_elements(const char *ELEMFILE, int anastomosis_elem_in = 0);
+void define_1d_element_geometry(const char *ELEMFILE);
+void define_1d_element_placenta(const char *ELEMFILE, int anastomosis_elem_in = 0);
 void define_rad_from_file(const char *FIELDFILE, const char *order_system="strahler", double s_ratio=1.54);
 void define_rad_from_geom(const char *ORDER_SYSTEM, double CONTROL_PARAM, const char *START_FROM, double START_RAD, const char *group_type_in="all", const char *group_option_in="dummy");
 void define_ven_rad_from_art(const char *FILENAME, double factor=2.00);

@@ -6,8 +6,12 @@ module arrays
 
   integer :: num_elems,num_nodes,num_units,maxgen,num_arterial_elems, &
              num_conv,num_conv_gen,anastomosis_elem,num_inlets,num_outlets
+
+  integer :: num_elems_fetal,num_nodes_fetal
   
   integer, parameter :: dp=kind(0.d0) !  for double precision
+  real(dp),parameter :: zero_tol = 1.0e-12_dp
+  real(dp),parameter :: loose_tol = 1.0e-6_dp
 
   integer,allocatable :: nodes(:) !allocated in define_node_geometry
   integer,allocatable :: elems(:) !allocated in define_1d_elements
@@ -25,12 +29,22 @@ module arrays
   integer, allocatable :: umbilical_outlets(:) !venous outlet
   integer :: min_art,max_art,min_ven,max_ven
 
+  integer,allocatable :: nodes_fetal(:) !allocated in define_node_geometry
+  integer,allocatable :: elems_fetal(:) !allocated in define_1d_elements
+  integer,allocatable :: elem_cnct_fetal(:,:,:)  !NXI(-ni:ni,1,ne)
+  integer,allocatable :: elem_nodes_fetal(:,:)
+  integer,allocatable :: elems_at_node_fetal(:,:)
 
   real(dp),allocatable :: elem_field(:,:) !properties of elements
   real(dp),allocatable :: elem_direction(:,:)
   real(dp),allocatable :: node_xyz(:,:)
   real(dp),allocatable :: unit_field(:,:) !properties of elastic units
   real(dp),allocatable :: node_field(:,:)
+
+  real(dp),allocatable :: elem_field_fetal(:,:) !properties of elements
+  real(dp),allocatable :: elem_direction_fetal(:,:)
+  real(dp),allocatable :: node_xyz_fetal(:,:)
+  real(dp),allocatable :: node_field_fetal(:,:)
 
   real(dp) :: cap_resistance,terminal_resistance,terminal_length, &
               cap_radius,total_cap_volume,total_cap_surface_area
@@ -50,7 +64,10 @@ module arrays
     cap_radius,elem_cnct_no_anast,anastomosis_elem, &
     is_capillary_unit,total_cap_volume,total_cap_surface_area,umbilical_inlets,umbilical_outlets, &
     art_ven_elem_map,num_inlets,num_outlets,min_art,max_art,min_ven,max_ven,num_convolutes,&
-    num_generations,num_parallel,model_type,capillary_model_type
+    num_generations,num_parallel,model_type,capillary_model_type,zero_tol,loose_tol
+
+  public elem_field_fetal, num_elems_fetal, elem_nodes_fetal, node_xyz_fetal, nodes_fetal, elems_fetal,&
+          num_nodes_fetal,node_field_fetal, elem_cnct_fetal,elem_direction_fetal,elems_at_node_fetal
 
 contains
   subroutine set_node_field_value(row, col, value)  
