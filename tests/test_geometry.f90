@@ -13,11 +13,11 @@ subroutine collect_geometry(testsuite)
   !> Collection of tests
   type(unittest_type), allocatable, intent(out) :: testsuite(:)
   testsuite = [ &
+    new_unittest("test_define_node_geometry", test_define_node_geometry), &
     new_unittest("test_define_1d_element_placenta", test_define_1d_element_placenta), &
-    new_unittest("test_define_rad_from_geom", test_define_rad_from_geom), &
-    new_unittest("test_add_matching_mesh", test_add_matching_mesh), &
     new_unittest("test_append_units", test_append_units), &
-    new_unittest("test_define_node_geometry", test_define_node_geometry) &
+    new_unittest("test_add_matching_mesh", test_add_matching_mesh), &
+    new_unittest("test_define_rad_from_geom", test_define_rad_from_geom) &
     ]
 
 end subroutine collect_geometry
@@ -507,6 +507,7 @@ end subroutine collect_geometry
     call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
   
     call set_elem_radius(test_elem_field)
+
     
     call check(error, test_elem_field(1,1:8), elem_field(ne_radius,1:num_elems))
     if (allocated(error)) return
@@ -515,19 +516,19 @@ end subroutine collect_geometry
   end subroutine test_define_rad_from_geom
 
  !subroutines to populate test data
-  subroutine set_elem_radius(elem_field)
+  subroutine set_elem_radius(elem_f)
     use arrays, only: dp
     implicit none
-    real(dp),intent(out) :: elem_field(1,8) !(1 : num_elems)
+    real(dp),intent(out) :: elem_f(1,8) !(1 : num_elems)
     
-    elem_field(1,1)=3.0_dp   
-    elem_field(1,2)=1.9480519480519483_dp    
-    elem_field(1,3)=1.9480519480519483_dp    
-    elem_field(1,4)=5.0000000000000009_dp
-    elem_field(1,5)=3.2258064516129035_dp
-    elem_field(1,6)=3.2258064516129035_dp
-    elem_field(1,7)=3.2258064516129035_dp
-    elem_field(1,8)=3.2258064516129035_dp
+    elem_f(1,1)=3.0_dp
+    elem_f(1,2)=1.9480519480519483_dp
+    elem_f(1,3)=1.9480519480519483_dp
+    elem_f(1,4)=5.0000000000000009_dp
+    elem_f(1,5)=3.2258064516129035_dp
+    elem_f(1,6)=3.2258064516129035_dp
+    elem_f(1,7)=3.2258064516129035_dp
+    elem_f(1,8)=3.2258064516129035_dp
   end subroutine set_elem_radius
   
 end module test_geometry
