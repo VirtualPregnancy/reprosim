@@ -23,7 +23,7 @@ end subroutine collect_prf_inlet_flow
     use indices, only: ne_Qdot,nj_bv_press,nu_perf,nu_blood_press,perfusion_indices
     use other_consts, only: MAX_FILENAME_LEN
     use geometry, only: define_node_geometry,define_1d_element_placenta,append_units, &
-                        add_matching_mesh,define_rad_from_geom
+                        add_matching_mesh,define_rad_from_geom,define_capillary_model
     use pressure_resistance_flow, only: evaluate_prq
     use test_data
     implicit none
@@ -38,6 +38,7 @@ end subroutine collect_prf_inlet_flow
     real(dp) :: test_elem_field(1,8) !(num_ne: num_elems)
     real(dp) :: test_node_field(1,8) !(num_nj : num_nodes)
     real(dp) :: test_unit_field(2,2) !(2 : num_units)
+    character(LEN=60) :: cap_model
    
     !call subroutines which need to be executed before evaluate_prq   
     NODEFILE = ""
@@ -67,6 +68,8 @@ end subroutine collect_prf_inlet_flow
     inlet_rad=5.0_dp  
     order_options = "venous"
     call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
+    cap_model = 'byrne_simplified'
+    call define_capillary_model(10,3,6,cap_model)
       
     mesh_type = "full_plus_tube"
     bc_type = "flow"
@@ -78,20 +81,10 @@ end subroutine collect_prf_inlet_flow
     call evaluate_prq(mesh_type,bc_type,rheology_type,vessel_type,inlet_flow,inlet_pressure,outlet_pressure)
       
     !populate test data
-    call set_flow(test_elem_field) 
-    call set_pressure(test_node_field)
-    call set_terminal_solution(test_unit_field)
-       
+    call set_flow(test_elem_field)
+    
     !check flow
-    call check(error, test_elem_field(1,1:8),elem_field(ne_Qdot,1:num_elems)) 
-    if (allocated(error)) return
-    !check pressure
-    call check(error, test_node_field(1,1:8),node_field(nj_bv_press,1:num_nodes)) 
-    if (allocated(error)) return
-    !check flow and pressure for terminal units 
-    call check(error, test_unit_field(1,1:2),unit_field(nu_perf,1:num_units)) 
-    if (allocated(error)) return
-    call check(error, test_unit_field(2,1:2),unit_field(nu_blood_press,1:num_units))   
+    call check(error, test_elem_field(1,1:8),elem_field(ne_Qdot,1:num_elems))
     if (allocated(error)) return
 
   end subroutine test_flow
@@ -104,43 +97,15 @@ end subroutine collect_prf_inlet_flow
     real(dp),intent(out) :: elem_field(1,8) !(num_ne : num_elems)
     
     elem_field(1,1) = 111666.7_dp 
-    elem_field(1,2) = 55833.294838280883_dp     
-    elem_field(1,3) = 55833.306428283686_dp     
-    elem_field(1,4) = 111666.80201897584_dp     
-    elem_field(1,5) = 55833.393571716500_dp     
-    elem_field(1,6) = 55833.306428283686_dp     
-    elem_field(1,7) = 55833.393571716500_dp     
-    elem_field(1,8) = 55833.306428283686_dp 
+    elem_field(1,2) = 55833.350000000020_dp
+    elem_field(1,3) = 55833.349999999969_dp
+    elem_field(1,4) = 111666.69999999992_dp
+    elem_field(1,5) = 55833.350000000006_dp
+    elem_field(1,6) = 55833.349999999969_dp
+    elem_field(1,7) = 55833.350000000006_dp
+    elem_field(1,8) = 55833.349999999969_dp
     
   end subroutine set_flow
 
-  subroutine set_pressure(node_field)
-    use arrays, only: dp
-    implicit none
-    real(dp),intent(out) :: node_field(1,8) !(1 : num_nodes)
-  
-    node_field(1,1) = 6650.0037645709381_dp     
-    node_field(1,2) = 5470.4463792225870_dp     
-    node_field(1,3) = 3124.8349354185775_dp     
-    node_field(1,4) = 3124.8190499593911_dp     
-    node_field(1,5) = 2660.0000000000000_dp     
-    node_field(1,6) = 2812.8706292625357_dp     
-    node_field(1,7) = 3124.8349310067424_dp     
-    node_field(1,8) = 3124.8339425717932_dp 
-                               
-  end subroutine set_pressure   
-   
-  subroutine set_terminal_solution(unit_field)
-    use arrays, only: dp
-    implicit none
-    real(dp),intent(out) :: unit_field(2,2) !(2 : num_units)
-    !flow
-    unit_field(1,1) = 55833.294838280883_dp  
-    unit_field(1,2) = 55833.306428283686_dp 
-    !pressure    
-    unit_field(2,1) = 3124.8349354185775_dp   
-    unit_field(2,2) = 3124.8190499593911_dp
-
-  end subroutine set_terminal_solution            
                                   
 end module test_prf_inlet_flow

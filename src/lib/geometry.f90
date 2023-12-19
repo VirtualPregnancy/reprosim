@@ -211,6 +211,9 @@ contains
     np_map = 0
     allocate(ne_map(num_elems))
     ne_map = 0
+    if(allocated(art_ven_elem_map))then !increasing the array size; just overwrite
+       deallocate(art_ven_elem_map)
+    end if
     allocate(art_ven_elem_map(num_elems))
     !!! increase the size of node and element arrays to accommodate the additional elements
     call reallocate_node_elem_arrays(num_elems_new,num_nodes_new)
@@ -218,6 +221,9 @@ contains
     ne_global = num_elems ! assumes this is the highest element number (!!!)
     np0 = num_nodes ! the starting local node number
     np_global = num_nodes ! assumes this is the highest node number (!!!)
+    if(allocated(umbilical_outlets))then
+        deallocate(umbilical_outlets)
+    end if
     allocate(umbilical_outlets(num_inlets))
     umbilical_outlets = 0    
     if(umbilical_elem_option.EQ.'single_umbilical_vein')then
@@ -719,6 +725,7 @@ subroutine define_capillary_model(define_convolutes,define_generations,define_pa
     sub_name = 'define_capillary_model'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
+    
 
     num_convolutes = define_convolutes
     num_generations = define_generations
