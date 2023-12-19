@@ -601,7 +601,7 @@ subroutine compartment_pressure_step(dpress,dt,comp,Q,V)
         subroutine rql_unit(dt,Q,Pgrad, R,L)
         use diagnostics, only: enter_exit,get_diagnostics_level
 
-    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_RQL_unit :: RQL_UNIT
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_RQL_unit" :: RQL_UNIT
         real(dp), intent(in) :: dt
         real(dp), intent(inout) :: Q
         real(dp), intent(in) :: Pgrad
