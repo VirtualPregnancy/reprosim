@@ -372,7 +372,7 @@ contains
           elem_nodes, nodes, elems, num_nodes, node_field, elem_cnct,elem_direction,elems_at_node,node_xyz
         use diagnostics, only: enter_exit,get_diagnostics_level
 
-    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ASSIGN_FETAL_ARRAYS" :: ASSIGN FETAL_ARRAYS
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ASSIGN_FETAL_ARRAYS" :: ASSIGN_FETAL_ARRAYS
 
         character(len=60) :: sub_name
         integer :: diagnostics_level
@@ -436,7 +436,7 @@ contains
           elem_nodes, nodes, elems, num_nodes, node_field, elem_cnct,elem_direction,elems_at_node,node_xyz
         use diagnostics, only: enter_exit,get_diagnostics_level
 
-    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_ASSIGN_FETAL_ARRAYS" :: ASSIGN FETAL_ARRAYS
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_DEALLOCATE_FETAL_MEMORY" :: DEALLOCATE_FETAL_MEMORY
 
         character(len=60) :: sub_name
         integer :: diagnostics_level
