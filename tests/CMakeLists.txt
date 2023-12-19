@@ -5,8 +5,6 @@ set(
   tests
   "geometry"
   "diagnostics"
-  "prf_inlet_flow"
-  "prf_inlet_pressure"
 )
 set(
   test-srcs

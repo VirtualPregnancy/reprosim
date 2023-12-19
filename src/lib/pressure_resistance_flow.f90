@@ -203,7 +203,6 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
 !! Calculate sparsity structure for solution matrices
     !Determine size of and allocate solution vectors/matrices
     call calc_sparse_size(mesh_dof,FIX,depvar_at_elem,MatrixSize,NonZeros,bc_type)
-
  	allocate (SparseCol(NonZeros), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory for SparseCol array ***"
 	allocate (SparseVal(NonZeros), STAT = AllocateStatus)
@@ -235,7 +234,6 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
       endif
    enddo !mesh_dof
    if((vessel_type.eq."rigid").and.(rheology_type.eq."constant_visc").and.(capillary_model_type.le.1))then
-
      !! ----CALL SOLVER----
      call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
          solver_solution, RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)

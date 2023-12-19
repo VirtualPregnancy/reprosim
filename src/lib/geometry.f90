@@ -207,8 +207,14 @@ contains
       print *, 'Original number of nodes ', num_nodes, ' elements ',num_elems
       print *, 'New number of nodes ', num_nodes_new, ' elements ',num_elems_new
     endif
+    if(allocated(np_map))then !increasing the array size; just overwrite
+       deallocate(np_map)
+    end if
     allocate(np_map(num_nodes))
     np_map = 0
+    if(allocated(ne_map))then !increasing the array size; just overwrite
+       deallocate(ne_map)
+    end if
     allocate(ne_map(num_elems))
     ne_map = 0
     if(allocated(art_ven_elem_map))then !increasing the array size; just overwrite
@@ -725,7 +731,7 @@ subroutine define_capillary_model(define_convolutes,define_generations,define_pa
     sub_name = 'define_capillary_model'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
-    
+
 
     num_convolutes = define_convolutes
     num_generations = define_generations
@@ -796,11 +802,17 @@ end subroutine define_capillary_model
       print *, "num_convolutes=",num_convolutes
       print *, "num_generations=",num_generations
     endif
-
+    if(allocated(resistance))then
+        deallocate(resistance)
+    end if
     allocate (resistance(num_convolutes+1), STAT = AllocateStatus)
     if (AllocateStatus /= 0)then
        STOP "*** Not enough memory for resistance array ***"
     endif
+
+    if(allocated(is_capillary_unit))then
+        deallocate(is_capillary_unit)
+    end if
 
     allocate(is_capillary_unit(num_elems), STAT = AllocateStatus)
     if (AllocateStatus /= 0)then
