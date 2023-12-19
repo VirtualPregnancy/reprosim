@@ -576,7 +576,7 @@ subroutine compartment_pressure_step(dpress,dt,comp,Q,V)
     subroutine rq_unit(dt,Q,Pgrad, R)
         use diagnostics, only: enter_exit,get_diagnostics_level
 
-    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_RQ_UNIT :: RQ_UNIT
+        !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_RQ_UNIT" :: RQ_UNIT
         real(dp), intent(in) :: dt
         real(dp), intent(inout) :: Q
         real(dp), intent(in) :: Pgrad
@@ -629,7 +629,7 @@ subroutine compartment_pressure_step(dpress,dt,comp,Q,V)
     subroutine rqk_unit(dt,Q,Pgrad, R,K)
         use diagnostics, only: enter_exit,get_diagnostics_level
 
-    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_RQK_UNIT :: RQK_UNIT
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_RQK_UNIT" :: RQK_UNIT
         real(dp), intent(in) :: dt
         real(dp), intent(inout) :: Q
         real(dp), intent(in) :: Pgrad
@@ -661,7 +661,7 @@ subroutine compartment_pressure_step(dpress,dt,comp,Q,V)
        subroutine rqkl_unit(dt,Q,Pgrad, R,K,L)
         use diagnostics, only: enter_exit,get_diagnostics_level
 
-    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_RQKL_UNIT :: RQKL_UNIT
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_RQKL_UNIT" :: RQKL_UNIT
         real(dp), intent(in) :: dt
         real(dp), intent(inout) :: Q
         real(dp), intent(in) :: Pgrad
