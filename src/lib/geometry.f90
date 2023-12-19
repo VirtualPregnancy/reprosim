@@ -1040,7 +1040,9 @@ end subroutine define_capillary_model
     call get_diagnostics_level(diagnostics_level)
 
     !Define the anastomoses that are created OUTSIDE of the simulator (that form part of the read in geometry)
-    anastomosis_elem = anastomosis_elem_in
+    if (present(anastomosis_elem_in)) then
+      anastomosis_elem = anastomosis_elem_in
+    end if
 
     open(10, file=ELEMFILE, status='old')
 
@@ -1106,7 +1108,7 @@ end subroutine define_capillary_model
                    call get_local_node(np_global,np) ! get local node np for global node
                    elem_nodes(nn,ne)=np ! the local node number, not global             
                    if(diagnostics_level.GT.1)then
-                   		print *,"elem_nodes(nn,ne)", nn, ne, "= np", np
+                     print *,"elem_nodes(nn,ne)", nn, ne, "= np", np
                    endif
                    sub_string = adjustl(sub_string(iend:i_ss_end)) ! get chars beyond blank, remove leading blanks
                 end do
@@ -1127,7 +1129,7 @@ end subroutine define_capillary_model
        elem_field(ne_length,ne) = DSQRT((node_xyz(1,np2) - &
             node_xyz(1,np1))**2 + (node_xyz(2,np2) - &
             node_xyz(2,np1))**2 + (node_xyz(3,np2) - &
-            node_xyz(3,np1))**2)   
+            node_xyz(3,np1))**2) 
        do j=1,3
           elem_direction(j,ne) = (node_xyz(j,np2) - &
                node_xyz(j,np1))/elem_field(ne_length,ne)           
@@ -1136,7 +1138,6 @@ end subroutine define_capillary_model
     enddo
 
     call element_connectivity_1d
-
 
     !populate umbilical_inlets array
     inlet_counter = 0
@@ -1156,7 +1157,6 @@ end subroutine define_capillary_model
 
     umbilical_inlets = umbilical_inlets_temp(1:inlet_counter)
     num_inlets = inlet_counter
-
 
     if(count(umbilical_inlets.NE.0).EQ.0)then
        print *,"inlet not found"

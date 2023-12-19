@@ -1,6 +1,6 @@
 
 
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.18)
 project(Reprosim VERSION 1.0.0 LANGUAGES Fortran C CXX)
 
 # Policy settings

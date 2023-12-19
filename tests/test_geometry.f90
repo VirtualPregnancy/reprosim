@@ -1,13 +1,36 @@
-@Test
-   subroutine test_define_node_geometry()
-      use pfunit_mod
+
+module test_geometry
+  use testdrive, only : new_unittest, unittest_type, error_type, check
+  implicit none
+  private
+
+  public :: collect_geometry
+
+contains
+
+!> Collect all exported unit tests
+subroutine collect_geometry(testsuite)
+  !> Collection of tests
+  type(unittest_type), allocatable, intent(out) :: testsuite(:)
+  testsuite = [ &
+    new_unittest("test_define_1d_elements", test_define_1d_elements), &
+    new_unittest("test_define_rad_from_geom", test_define_rad_from_geom), &
+    new_unittest("test_add_matching_mesh", test_add_matching_mesh), &
+    new_unittest("test_append_units", test_append_units), &
+    new_unittest("test_define_node_geometry", test_define_node_geometry) &
+    ]
+
+end subroutine collect_geometry
+
+   subroutine test_define_node_geometry(error)
       use arrays,only: dp,node_xyz,num_nodes,nodes
-      use geometry,only: define_node_geometry	
+      use geometry,only: define_node_geometry
       use other_consts, only: MAX_FILENAME_LEN
       use indices, only: perfusion_indices
       use test_data, only: write_node_file,delete_node_file
       implicit none
       
+      type(error_type), allocatable, intent(out) :: error
       character(len=MAX_FILENAME_LEN) :: NODEFILE
       real(dp) :: test_node_xyz(3,4) ! (3:num_nodes)
       integer :: test_nodes(4) !num_nodes
@@ -25,9 +48,14 @@
       call set_nodes(test_nodes)
       call set_node_xyz(test_node_xyz)  
      
-      @assertEqual(4, num_nodes)
-      @assertEqual(test_nodes, nodes)
-      @assertEqual(test_node_xyz,node_xyz)
+      call check(error, 4, num_nodes)
+      if (allocated(error)) return
+
+      call check(error, test_nodes, nodes)
+      if (allocated(error)) return
+
+      call check(error, test_node_xyz, node_xyz)
+      if (allocated(error)) return
       
       call delete_node_file(NODEFILE) 
 
@@ -64,18 +92,18 @@
 
 !***************************************************
 
-@Test
-   subroutine test_define_1d_elements()
-      use pfunit_mod
+   subroutine test_define_1d_elements(error)
       use arrays,only: dp,num_elems,elem_nodes,elems_at_node,elem_cnct, &
            num_nodes,node_xyz,nodes,elem_field,elem_direction,elem_ordrs,maxgen
-      use geometry,only: define_1d_elements	
+      use geometry,only: define_1d_elements, define_node_geometry
       use indices, only: ne_length,num_ord,perfusion_indices
       use other_consts, only: MAX_FILENAME_LEN
-      use test_data, only: write_elem_file,delete_elem_file
+      use test_data, only: write_elem_file,delete_elem_file, write_node_file, delete_node_file
+      use diagnostics, only: get_diagnostics_level, set_diagnostics_level
       implicit none
 
-      character(len=MAX_FILENAME_LEN) :: ELEMFILE
+      type(error_type), allocatable, intent(out) :: error
+      character(len=MAX_FILENAME_LEN) :: ELEMFILE, NODEFILE
       integer :: test_elem_nodes(2,3) !(2,num_elems)
       integer :: test_elems_at_node(4,0:3)    
       integer :: test_elem_cnct(-1:1,0:2,0:3) !array size: -1:1,0:2,0:num_elems    
@@ -83,9 +111,14 @@
       real(dp) :: test_elem_direction(3,3) !array size: 3,num_elems   
       integer :: test_elem_ordrs(num_ord,3) !array size: num_ord, num_elems 
 
+      call set_diagnostics_level(0)
       ELEMFILE = ""
+      NODEFILE = ""
+
+      call write_node_file(NODEFILE)
       call write_elem_file(ELEMFILE)
           
+      call define_node_geometry(NODEFILE)
       call define_1d_elements(ELEMFILE)
      
       !populate test variables - variables populated by sub define_1d_elements
@@ -96,16 +129,32 @@
       call set_elem_direction(test_elem_direction) 
       call set_elem_ordrs(test_elem_ordrs)  
     
-      @assertEqual(3, num_elems)
-      @assertEqual(test_elem_nodes,elem_nodes)
-      @assertEqual(test_elems_at_node,elems_at_node)
-      @assertEqual(test_elem_cnct,elem_cnct)
-      @assertEqual(test_elem_field(1,3),elem_field(ne_length,num_elems))
-      @assertEqual(test_elem_direction,elem_direction)
-      @assertEqual(test_elem_ordrs,elem_ordrs) 
-      @assertEqual(2,maxgen)
+      call check(error, 3, num_elems)
+      if (allocated(error)) return
+
+      call check(error, test_elem_nodes, elem_nodes)
+      if (allocated(error)) return
+      
+      call check(error, test_elems_at_node, elems_at_node)
+      if (allocated(error)) return
+
+      call check(error, test_elem_cnct, elem_cnct)
+      if (allocated(error)) return
+
+      call check(error, test_elem_field(1,3), elem_field(ne_length,num_elems))
+      if (allocated(error)) return
+
+      call check(error, test_elem_direction, elem_direction)
+      if (allocated(error)) return
+
+      call check(error, test_elem_ordrs, elem_ordrs)
+      if (allocated(error)) return
+
+      call check(error, 2, maxgen)
+      if (allocated(error)) return
       
       call delete_elem_file(ELEMFILE)
+      call delete_node_file(NODEFILE)
      
    end subroutine test_define_1d_elements
 
@@ -194,15 +243,13 @@
   
 !***************************************************
   
-@Test
-
-  subroutine test_append_units()
-    use pfunit_mod
+  subroutine test_append_units(error)
     use arrays,only: num_units,units,elem_units_below
     use indices,only: num_nu
     use geometry, only:append_units
     implicit none
 
+    type(error_type), allocatable, intent(out) :: error
     integer :: test_units(2)
     integer :: test_elem_units_below(1:3) ! 1:num_elems
       
@@ -212,9 +259,14 @@
     call set_units(test_units)
     call set_elem_units_below(test_elem_units_below)
             
-    @assertEqual(2, num_units)   
-    @assertEqual(test_units,units)   
-    @assertEqual(test_elem_units_below,elem_units_below)
+    call check(error, 2, num_units)
+    if (allocated(error)) return
+
+    call check(error, test_units, units)
+    if (allocated(error)) return
+
+    call check(error, test_elem_units_below, elem_units_below)
+    if (allocated(error)) return
             
   end subroutine test_append_units
 
@@ -236,23 +288,21 @@
 
 !***************************************************
    
-@Test
-
-   subroutine test_add_matching_mesh()
-      use pfunit_mod
+   subroutine test_add_matching_mesh(error)
       use arrays,only: dp,num_nodes,num_elems,nodes,node_xyz,elems,elem_nodes,&
                        elems_at_node,elem_field,elem_direction,elem_cnct,elem_ordrs                      
       use geometry, only:add_matching_mesh
       use indices, only: num_ord
       implicit none
 
+      type(error_type), allocatable, intent(out) :: error
       integer :: test_nodes(8) !arterial and venous num_nodes
       real(dp) :: test_node_xyz(3,8) !(3:num_nodes)
       integer :: test_elem_nodes(2,8) !(2:num_elems)
       integer :: test_elems_at_node(8,0:3) !array size: num_nodes, 0:3
       integer :: test_elem_cnct(-1:1,0:2,0:8) !array size: -1:1,0:2,0:num_elems
       integer :: test_elem_ordrs(num_ord,8) !array size: num_ord, num_elems
-      character(LEN=60) :: umbilical_elem_option     
+      character(LEN=100) :: umbilical_elem_option     
 
       umbilical_elem_option = "same_as_arterial"
       call add_matching_mesh(umbilical_elem_option)
@@ -269,14 +319,29 @@
       call set_elem_ordrs(test_elem_ordrs(1:3,1:3))
       call set_elem_ordrs_ven(test_elem_ordrs(1:3,4:8))
       
-      @assertEqual(8, num_nodes)
-      @assertEqual(8, num_elems)
-      @assertEqual(test_nodes, nodes)
-      @assertEqual(test_node_xyz,node_xyz)
-      @assertEqual(test_elem_nodes,elem_nodes)
-      @assertEqual(test_elems_at_node,elems_at_node)
-      @assertEqual(test_elem_cnct,elem_cnct)
-      @assertEqual(test_elem_ordrs,elem_ordrs)
+      call check(error, 8, num_nodes)
+      if (allocated(error)) return
+
+      call check(error, 8, num_elems)
+      if (allocated(error)) return
+
+      call check(error, test_nodes, nodes)
+      if (allocated(error)) return
+
+      call check(error, test_node_xyz, node_xyz)
+      if (allocated(error)) return
+
+      call check(error, test_elem_nodes, elem_nodes)
+      if (allocated(error)) return
+
+      call check(error, test_elems_at_node, elems_at_node)
+      if (allocated(error)) return
+
+      call check(error, test_elem_cnct, elem_cnct)
+      if (allocated(error)) return
+
+      call check(error, test_elem_ordrs, elem_ordrs)
+      if (allocated(error)) return
          
    end subroutine test_add_matching_mesh
 
@@ -412,15 +477,13 @@
   
 !***************************************************
   
-@Test
-
-  subroutine test_define_rad_from_geom()
-    use pfunit_mod
+  subroutine test_define_rad_from_geom(error)
     use arrays,only: dp,elem_field,num_elems                     
     use geometry, only:define_rad_from_geom
     use indices, only: ne_radius
     implicit none  
   
+    type(error_type), allocatable, intent(out) :: error
     character(LEN=100) :: order_system,order_options,name
     real(dp) :: s_ratio, inlet_rad
     real(dp) :: test_elem_field(1,8) !(1: num_elems)
@@ -432,7 +495,7 @@
     inlet_rad=3.0_dp    
     order_options = "arterial"
     
-    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options,"")
+    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
     
     !define radius for venous vessels
     order_system = "strahler"
@@ -440,12 +503,14 @@
     name = ""
     inlet_rad=5.0_dp  
     order_options = "venous"
-    call define_rad_from_geom(order_system, s_ratio, name, &
-                    inlet_rad, order_options,"")
+
+    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
   
     call set_elem_radius(test_elem_field)
     
-    @assertEqual(test_elem_field(1,1:8),elem_field(ne_radius,1:num_elems)) 
+    call check(error, test_elem_field(1,1:8), elem_field(ne_radius,1:num_elems))
+    if (allocated(error)) return
+
  
   end subroutine test_define_rad_from_geom
 
@@ -464,3 +529,6 @@
     elem_field(1,7)=3.2258064516129035_dp
     elem_field(1,8)=3.2258064516129035_dp
   end subroutine set_elem_radius
+  
+end module test_geometry
+

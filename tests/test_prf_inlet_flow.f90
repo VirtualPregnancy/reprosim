@@ -1,6 +1,23 @@
-@Test
-  subroutine test_prf_inlet_flow()
-    use pfunit_mod
+module test_prf_inlet_flow
+  use testdrive, only : new_unittest, unittest_type, error_type, check
+  implicit none
+  private
+
+  public :: collect_prf_inlet_flow
+
+contains
+
+!> Collect all exported unit tests
+subroutine collect_prf_inlet_flow(testsuite)
+  !> Collection of tests
+  type(unittest_type), allocatable, intent(out) :: testsuite(:)
+  testsuite = [ &
+    new_unittest("test_flow", test_flow) &
+    ]
+
+end subroutine collect_prf_inlet_flow
+
+  subroutine test_flow(error)
     use arrays, only: dp,elem_field,node_field,num_elems,num_nodes, &
                       num_units,unit_field 
     use indices, only: ne_Qdot,nj_bv_press,nu_perf,nu_blood_press,perfusion_indices
@@ -11,11 +28,12 @@
     use test_data
     implicit none
 
+    type(error_type), allocatable, intent(out) :: error
     character(len=MAX_FILENAME_LEN) :: NODEFILE
     character(len=MAX_FILENAME_LEN) :: ELEMFILE
     character(LEN=100) :: order_system,order_options,name
     real(dp) :: s_ratio, inlet_rad
-    character(LEN=60) :: mesh_type, bc_type, rheology_type,vessel_type,umbilical_elem_option
+    character(LEN=100) :: mesh_type, bc_type, rheology_type,vessel_type,umbilical_elem_option
     real(dp) :: inlet_flow,inlet_pressure,outlet_pressure
     real(dp) :: test_elem_field(1,8) !(num_ne: num_elems)
     real(dp) :: test_node_field(1,8) !(num_nj : num_nodes)
@@ -41,15 +59,14 @@
     name = "inlet"
     inlet_rad=3.0_dp    
     order_options = "arterial"   
-    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options,"")   
+    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
     !define radius for venous vessels
     order_system = "strahler"
     s_ratio=1.55_dp
     name = ""
     inlet_rad=5.0_dp  
     order_options = "venous"
-    call define_rad_from_geom(order_system, s_ratio, name, &
-                    inlet_rad, order_options,"")
+    call define_rad_from_geom(order_system, s_ratio, name, inlet_rad, order_options)
       
     mesh_type = "full_plus_tube"
     bc_type = "flow"
@@ -66,14 +83,18 @@
     call set_terminal_solution(test_unit_field)
        
     !check flow
-    @assertEqual(test_elem_field(1,1:8),elem_field(ne_Qdot,1:num_elems)) 
+    call check(error, test_elem_field(1,1:8),elem_field(ne_Qdot,1:num_elems)) 
+    if (allocated(error)) return
     !check pressure
-    @assertEqual(test_node_field(1,1:8),node_field(nj_bv_press,1:num_nodes)) 
+    call check(error, test_node_field(1,1:8),node_field(nj_bv_press,1:num_nodes)) 
+    if (allocated(error)) return
     !check flow and pressure for terminal units 
-    @assertEqual(test_unit_field(1,1:2),unit_field(nu_perf,1:num_units)) 
-    @assertEqual(test_unit_field(2,1:2),unit_field(nu_blood_press,1:num_units))   
+    call check(error, test_unit_field(1,1:2),unit_field(nu_perf,1:num_units)) 
+    if (allocated(error)) return
+    call check(error, test_unit_field(2,1:2),unit_field(nu_blood_press,1:num_units))   
+    if (allocated(error)) return
 
-  end subroutine test_prf_inlet_flow
+  end subroutine test_flow
 
 !subroutines to populate test data
 
@@ -122,3 +143,4 @@
 
   end subroutine set_terminal_solution            
                                   
+end module test_prf_inlet_flow
