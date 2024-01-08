@@ -29,7 +29,7 @@ setup(
   author='Reproduction and Development Group, Auckland Bioengineering Institute.',
   author_email='alys.clark@auckland.ac.nz',
   packages=['reprosim'],
-#  package_data={'reprosim': []},
+  package_data={'reprosim': [@SETUP_PY_PACKAGE_FILES_STR@]},
   platforms=['any'],
   url='http://www.abi.auckland.ac.nz/en/about/our-research/development-and-reproductive-health.html',
   license='http://www.apache.org/licenses/LICENSE-2.0',

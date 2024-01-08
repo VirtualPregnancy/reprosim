@@ -33,6 +33,8 @@ public num_nu,nu_perf,nu_blood_press
 
 public model_type
 
+!dec$ attributes dllexport :: ne_Qdot, nu_perf, nj_bv_press, nu_blood_press, ne_radius, ne_length, num_ord
+
 !Interfaces
 private
 public perfusion_indices, get_ne_radius

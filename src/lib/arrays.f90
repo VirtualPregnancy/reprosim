@@ -51,6 +51,9 @@ module arrays
     is_capillary_unit,total_cap_volume,total_cap_surface_area,umbilical_inlets,umbilical_outlets, &
     art_ven_elem_map,num_inlets,num_outlets,min_art,max_art,min_ven,max_ven,num_convolutes,&
     num_generations,num_parallel,model_type,capillary_model_type
+  
+!dec$ attributes dllexport :: elem_nodes, elem_units_below, maxgen, elem_direction, num_elems, num_nodes, elems_at_node
+!dec$ attributes dllexport :: elem_ordrs, elem_field, elem_cnct, node_xyz, nodes, units, unit_field, node_field, num_units
 
 contains
   subroutine set_node_field_value(row, col, value)  
