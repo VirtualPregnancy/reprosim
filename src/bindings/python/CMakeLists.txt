@@ -10,6 +10,7 @@ set(PYTHONLIBS_SWIG_FLAGS -relativeimport)
 set(INTERFACE_SRCS
   ../interface/arrays.i
   ../interface/diagnostics.i
+  ../interface/fetal.i
   ../interface/geometry.i
   ../interface/indices.i
   ../interface/pressure_resistance_flow.i

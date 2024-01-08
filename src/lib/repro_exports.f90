@@ -67,6 +67,8 @@ contains
 
     use arrays,only: elem_nodes,num_elems
     use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
+    use diagnostics, only: enter_exit
+
     implicit none
   !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_1D_ELEM_GEOMETRY" :: EXPORT_1D_ELEM_GEOMETRY
 
@@ -78,6 +80,10 @@ contains
     integer :: len_end,ne,nj,nn
     character(len=1) :: char1
     logical :: CHANGED
+    character(len=60) :: sub_name
+
+    sub_name = 'export_1d_elem_geometry'
+    call enter_exit(sub_name,1)
 
     open(10, file=EXELEMFILE, status='replace')
     len_end=len_trim(name)
@@ -117,6 +123,7 @@ contains
     enddo !no_nelist (ne)
     close(10)
 
+    call enter_exit(sub_name,2)
   end subroutine export_1d_elem_geometry
 
 
