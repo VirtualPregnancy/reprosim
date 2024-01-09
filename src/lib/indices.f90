@@ -40,6 +40,8 @@ public num_nj_fetal, njf_press,njf_vol,njf_comp,njf_type,njf_netQ
 
 public model_type
 
+!dec$ attributes dllexport :: ne_Qdot, nu_perf, nj_bv_press, nu_blood_press, ne_radius, ne_length, num_ord
+
 !Interfaces
 private
 public perfusion_indices, get_ne_radius

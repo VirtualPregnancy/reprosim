@@ -1,6 +1,6 @@
 
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(Reprosim VERSION 1.0.0 LANGUAGES Fortran C CXX)
 
 # Policy settings
@@ -12,6 +12,14 @@ if(POLICY CMP0086)
 endif()
 
 get_property(IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+
+if(IS_MULTI_CONFIG)
+  set(CONFIG_DIR_SUFFIX "/$<CONFIG>")
+endif()
+
+if (MSVC)
+  cmake_path(GET CMAKE_Fortran_COMPILER PARENT_PATH FORTRAN_RUNTIME_PATH)
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -34,12 +42,16 @@ endif()
 set(REPROSIM_BUILD_SHARED ${BUILD_SHARED} CACHE BOOL "Build shared library (true) or static library (false)")
 set(BUILD_SHARED_LIBS ${REPROSIM_BUILD_SHARED} CACHE INTERNAL "Internalise BUILD_SHARED_LIBS, manipulate via REPROSIM_BUILD_SHARED" FORCE)
 
-# Set the build type Release, Debug plus more if you define them
-if(NOT BUILD_TYPE)
-  set(BUILD_TYPE Release)
+if(IS_MULTI_CONFIG)
+  mark_as_advanced(CMAKE_CONFIGURATION_TYPES)
+else()
+  # Set the build type Release, Debug plus more if you define them
+  if(NOT BUILD_TYPE)
+    set(BUILD_TYPE Release)
+  endif()
+  set(REPROSIM_BUILD_TYPE ${BUILD_TYPE} CACHE STRING "Set the build type; [Release], Debug, Pedantic (GNU Fortran only)")
+  set(CMAKE_BUILD_TYPE ${REPROSIM_BUILD_TYPE} CACHE INTERNAL "Internalise CMAKE_BUILD_TYPE, manipulate via REPROSIM_BUILD_TYPE" FORCE)
 endif()
-set(REPROSIM_BUILD_TYPE ${BUILD_TYPE} CACHE STRING "Set the build type; [Release], Debug, Pedantic (GNU Fortran only)")
-set(CMAKE_BUILD_TYPE ${REPROSIM_BUILD_TYPE} CACHE INTERNAL "Internalise CMAKE_BUILD_TYPE, manipulate via REPROSIM_BUILD_TYPE" FORCE)
 
 # Set whether to build bindgins or not, may require SWIG
 option(REPROSIM_BUILD_BINDINGS "Build bindings for ${PROJECT}, may require SWIG" YES)

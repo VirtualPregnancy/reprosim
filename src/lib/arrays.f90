@@ -68,6 +68,9 @@ module arrays
 
   public elem_field_fetal, num_elems_fetal, elem_nodes_fetal, node_xyz_fetal, nodes_fetal, elems_fetal,&
           num_nodes_fetal,node_field_fetal, elem_cnct_fetal,elem_direction_fetal,elems_at_node_fetal
+  
+!dec$ attributes dllexport :: elem_nodes, elem_units_below, maxgen, elem_direction, num_elems, num_nodes, elems_at_node
+!dec$ attributes dllexport :: elem_ordrs, elem_field, elem_cnct, node_xyz, nodes, units, unit_field, node_field, num_units
 
 contains
   subroutine set_node_field_value(row, col, value)  

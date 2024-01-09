@@ -26,7 +26,6 @@ foreach(t IN LISTS tests)
 endforeach()
 
 string(REGEX REPLACE ", &\n$" " &" TEST_SUITE_LIST_STATEMENT "${TEST_SUITE_LIST_STATEMENT}")
-message(STATUS "${TEST_SUITE_LIST_STATEMENT}")
 set(test-main "${CMAKE_CURRENT_BINARY_DIR}/testmain.f90")
 configure_file(testmain.in.f90 ${test-main})
 list(APPEND test-srcs ${test-main})
@@ -62,11 +61,15 @@ target_link_libraries(utils PRIVATE reprosim)
 target_link_libraries(
   "${PROJECT_NAME}-tester"
   PRIVATE
-  ${_REPROSIM_LINK_LIBRARY} 
+  reprosim
   utils
 )
 
 foreach(t IN LISTS tests)
-  add_test("${PROJECT_NAME}/${t}" "${PROJECT_NAME}-tester" "${t}")
+  set(_TEST_NAME "${PROJECT_NAME}/${t}")
+  add_test("${_TEST_NAME}" "${PROJECT_NAME}-tester" "${t}")
+  if(MSVC)
+    set(_TEST_PROPERTIES "PATH=$<TARGET_FILE_DIR:reprosim>\;${FORTRAN_RUNTIME_PATH}")
+    set_tests_properties("${_TEST_NAME}" PROPERTIES ENVIRONMENT "${_TEST_PROPERTIES}" RANDOM_THING $<TARGET_FILE_DIR:reprosim_c>)
+  endif()
 endforeach()
-
