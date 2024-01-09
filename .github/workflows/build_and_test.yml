@@ -133,7 +133,7 @@ jobs:
     - name: Report CMake version
       run: |
         cmake --version
-        ninja --version
+        command -v ninja >/dev/null 2>&1 && ninja --version || echo "ninja is not available."
 
     - name: Create virtual environment
       shell: cmake -P {0}
