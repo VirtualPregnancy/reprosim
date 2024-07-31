@@ -135,5 +135,57 @@ contains
 #endif
 
   end subroutine export_node_field_c
+!!!################################################################
+
+  subroutine export_1d_elem_geometry_grpd_c(EXELEMFILE, filename_len, name, name_len, mesh_code, mesh_code_len) &
+    bind(C, name="export_1d_elem_geometry_grpd_c")
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use repro_exports, only: export_1d_elem_geometry_grpd
+    use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
+    implicit none
+    integer,intent(in) :: filename_len, name_len, mesh_code_len
+    type(c_ptr), value, intent(in) :: EXELEMFILE, name, mesh_code
+    character(len=MAX_FILENAME_LEN) :: filename_f
+    character(len=MAX_STRING_LEN) :: name_f, mesh_code_f
+
+    call strncpy(filename_f, EXELEMFILE, filename_len)
+    call strncpy(name_f, name, name_len)
+    call strncpy(mesh_code_f, mesh_code, mesh_code_len)
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_export_1d_elem_geometry_grpd(filename_f, name_f, mesh_code_f)
+#else
+    call export_1d_elem_geometry_grpd(filename_f, name_f, mesh_code_f)
+#endif
+
+  end subroutine export_1d_elem_geometry_grpd_c
+
+  subroutine export_1d_elem_field_grouped_c(ne_field, EXELEMFILE, filename_len, group_name, group_name_len, &
+    field_name, field_name_len, mesh_code, mesh_code_len) bind(C, name="export_1d_elem_field_grouped_c")
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use repro_exports, only: export_1d_elem_field_grouped
+    use other_consts, only: MAX_STRING_LEN, MAX_FILENAME_LEN
+    implicit none
+    integer,intent(in) :: ne_field, filename_len, group_name_len, field_name_len, mesh_code_len
+    type(c_ptr), value, intent(in) :: EXELEMFILE, group_name, field_name, mesh_code
+    character(len=MAX_FILENAME_LEN) :: filename_f
+    character(len=MAX_STRING_LEN) :: group_name_f, field_name_f, mesh_code_f
+
+    call strncpy(filename_f, EXELEMFILE, filename_len)
+    call strncpy(group_name_f, group_name, group_name_len)
+    call strncpy(field_name_f, field_name, field_name_len)
+    call strncpy(mesh_code_f, mesh_code, mesh_code_len)
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_export_1d_elem_field_grouped(ne_field, filename_f, group_name_f, field_name_f, mesh_code_f)
+#else
+    call export_1d_elem_field_grouped(ne_field, filename_f, group_name_f, field_name_f, mesh_code_f)
+#endif
+
+  end subroutine export_1d_elem_field_grouped_c
+!!!############################################################################
+
 
 end module repro_exports_c

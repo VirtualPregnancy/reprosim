@@ -5,8 +5,9 @@ module repro_exports
   implicit none
 
   private
-  public export_1d_elem_geometry,export_1d_elem_geometry_grpd,export_1d_elem_field_grouped,export_node_geometry,&
-    export_node_field,export_terminal_perfusion,export_1d_elem_field
+  public export_1d_elem_geometry,export_node_geometry,export_node_field,&
+       export_terminal_perfusion,&
+       export_1d_elem_field
 
 contains
 !!!################################################################
@@ -167,7 +168,6 @@ contains
              enddo
           endif !FIRST_NODE
           !***      write the node
-
           write(10,'(1X,''Node: '',I12)') np
           do nj=1,3
              write(10,'(2X,4(1X,F12.6))') (node_xyz(nj,np))
@@ -295,158 +295,6 @@ contains
 
   end subroutine export_node_field
 
-!!!################################################################
+!!! ###########################################################
 
-  subroutine export_1d_elem_field_grouped(ne_field, EXELEMFILE, group_name, field_name , mesh_type)
-
-    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
-    use arrays,only: dp,elem_field,num_elems
-    use indices
-    implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_1D_ELEM_FIELD_GROUPED" :: EXPORT_1D_ELEM_FIELD_GROUPED
-
-!!! Parameters
-    integer, intent(in) :: ne_field
-    real(dp) :: mesh_code
-    character(len=MAX_FILENAME_LEN), intent(in) :: EXELEMFILE
-    character(len=MAX_STRING_LEN), intent(in) :: field_name
-    character(len=MAX_STRING_LEN), intent(in) :: group_name
-    character(len=MAX_STRING_LEN), intent(in) :: mesh_type
-
-
-!!! Local Variables
-    integer :: len_end,ne
-    logical :: CHANGED
-
-    if(mesh_type.eq.'art') then
-       mesh_code = 0.0_dp
-    elseif(mesh_type.eq.'vein')then
-       mesh_code = 1.0_dp
-    elseif(mesh_type.eq.'cap')then
-       mesh_code = 2.0_dp
-    elseif(mesh_type.eq.'anast')then
-       mesh_code = 3.0_dp
-
-    endif
-    open(10, file=EXELEMFILE, status='replace')
-
-    len_end=len_trim(group_name)
-    !**     write the group name
-    write(10,'( '' Group name: '',A)') group_name(:len_end)
-    !**         write the elements
-    write(10,'( '' Shape.  Dimension=1'' )')
-    CHANGED=.TRUE. !initialise to force output of element information
-    len_end=len_trim(field_name)
-    do ne=1,num_elems
-       if(ne>1) THEN
-          CHANGED=.FALSE.
-       endif
-       if(CHANGED)THEN
-          write(10,'( '' #Scale factor sets=0'' )')
-          write(10,'( '' #Nodes= 0'' )')
-          write(10,'( '' #Fields= 1'' )')
-          write(10,'( '' 1)'',A,'', field, rectangular cartesian, #Components=1'')')&
-               field_name(:len_end)
-          write(10,'( ''  '',A,''.  l.Lagrange, no modify, grid based.'')') &
-               field_name(:len_end)
-          write(10,'( ''  #xi1=1'')')
-       endif
-       if(elem_field(ne_group,ne).eq.mesh_code)then
-         write(10,'(1X,''Element: '',I12,'' 0 0'' )') ne
-         write(10,'(3X,''Values:'' )')
-         write(10,'(4X,2(1X,E12.5))') elem_field(ne_field,ne),elem_field(ne_field,ne)
-       endif
-    enddo !no_nelist (ne)
-    close(10)
-
-  end subroutine export_1d_elem_field_grouped
-
-
-!!!################################################################
-
-
-  subroutine export_1d_elem_geometry_grpd(EXELEMFILE, name, mesh_type)
-
-    use arrays,only: dp,elem_field,elem_nodes,num_elems
-    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
-    use indices
-    use diagnostics, only: enter_exit
-
-    implicit none
-  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EXPORT_1D_ELEM_GEOMETRY_GRPD" :: EXPORT_1D_ELEM_GEOMETRY_GRPD
-
-!!! Parameters
-    character(len=MAX_FILENAME_LEN), intent(in) :: EXELEMFILE
-    character(len=MAX_STRING_LEN), intent(in) :: name
-    character(len=MAX_STRING_LEN), intent(in) :: mesh_type
-
-!!! Local Variables
-    integer :: len_end,ne,nj,nn
-    real(dp) :: mesh_code
-    character(len=1) :: char1
-    logical :: CHANGED
-    character(len=60) :: sub_name
-
-    sub_name = 'export_1d_elem_geometry'
-    call enter_exit(sub_name,1)
-
-
-
-    if(mesh_type.eq.'art') then
-       mesh_code = 0.0_dp
-    elseif(mesh_type.eq.'vein')then
-       mesh_code = 1.0_dp
-    elseif(mesh_type.eq.'cap')then
-       mesh_code = 2.0_dp
-    elseif(mesh_type.eq.'anast')then
-       mesh_code = 3.0_dp
-
-    endif
-    open(10, file=EXELEMFILE, status='replace')
-    len_end=len_trim(name)
-    !**     write the group name
-    write(10,'( '' Group name: '',A)') name(:len_end)
-    !**         write the elements
-    write(10,'( '' Shape.  Dimension=1'' )')
-    CHANGED=.TRUE. !initialise to force output of element information
-    do ne=1,num_elems
-       if(ne>1) THEN
-          CHANGED=.FALSE.
-       endif
-       if(CHANGED)THEN
-          write(10,'( '' #Scale factor sets=1'' )')
-          write(10,'( ''   l.Lagrange, #Scale factors= 2'' )')
-          write(10,'( '' #Nodes= 2'' )')
-          write(10,'( '' #Fields= 1'' )')
-          write(10,'( '' 1) coordinates, coordinate, rectangular cartesian, #Components=3'')')
-          do nj=1,3
-             if(nj==1) char1='x'; if(nj==2) char1='y'; if(nj==3) char1='z';
-             write(10,'(''  '',A2,''.  l.Lagrange, no modify, standard node based.'')') char1
-             write(10,'( ''     #Nodes= 2'')')
-             do nn=1,2
-                write(10,'(''      '',I1,''.  #Values=1'')') nn
-                write(10,'(''       Value indices:      1 '')')
-                write(10,'(''       Scale factor indices:'',I4)') nn
-             enddo !nn
-          enddo !nj
-       endif
-       if(elem_field(ne_group,ne).eq.mesh_code)then
-
-           write(10,'(1X,''Element: '',I12,'' 0 0'' )') ne
-           !**               write the nodes
-           write(10,'(3X,''Nodes:'' )')
-           write(10,'(4X,2(1X,I12))') elem_nodes(1,ne),elem_nodes(2,ne)
-           !**                 write the scale factors
-           write(10,'(3X,''Scale factors:'' )')
-           write(10,'(4X,2(1X,E12.5))') 1.d0,1.d0
-
-       endif
-    enddo !no_nelist (ne)
-    close(10)
-
-    call enter_exit(sub_name,2)
-  end subroutine export_1d_elem_geometry_grpd
-
-
-!!!##########################################################################
 end module repro_exports

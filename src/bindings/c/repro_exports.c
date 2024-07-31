@@ -11,6 +11,9 @@ void export_node_field_c(int *nj_field, const char *EXNODEFIELD, int *EXNODEFIEL
                          const char *name, int *name_len, const char *field_name, int *field_name_len);
 void export_terminal_perfusion_c(const char *EXNODEFILE, int *EXNODEFILE_LEN, const char *name, int *name_len);
 void export_node_geometry_c(const char *EXNODEFILE, int *EXNODEFILE_LEN, const char *name, int *name_len);
+void export_1d_elem_geometry_grpd_c(const char *EXELEMFILE, int *EXELEMFILE_LEN, const char *name, int *name_len, const char *mesh_code, int *mesh_code_len);
+void export_1d_elem_field_grouped_c(int *ne_field, const char *EXELEMFILE, int *EXELEMFILE_LEN,
+                            const char *group_name, int *group_name_len, const char *field_name, int *field_name_len , const char *mesh_code, int *mesh_code_len);
 
 void export_1d_elem_field(int ne_field, const char *EXELEMFILE, const char *group_name, const char *field_name )
 {
@@ -20,7 +23,14 @@ void export_1d_elem_field(int ne_field, const char *EXELEMFILE, const char *grou
 
   export_1d_elem_field_c(&ne_field, EXELEMFILE, &filename_len, group_name, &group_name_len, field_name, &field_name_len);
 }
-
+void export_1d_elem_field_grouped(int ne_field, const char *EXELEMFILE, const char *group_name, const char *field_name , const char *mesh_code)
+{
+  int filename_len = strlen(EXELEMFILE);
+  int group_name_len = strlen(group_name);
+  int field_name_len = strlen(field_name);
+  int mesh_code_len = strlen(mesh_code);
+  export_1d_elem_field_grouped_c(&ne_field, EXELEMFILE, &filename_len, group_name, &group_name_len, field_name, &field_name_len, mesh_code, &mesh_code_len);
+}
 void export_1d_elem_geometry(const char *EXELEMFILE, const char *name)
 {
   int filename_len = strlen(EXELEMFILE);
@@ -28,7 +38,14 @@ void export_1d_elem_geometry(const char *EXELEMFILE, const char *name)
 
   export_1d_elem_geometry_c(EXELEMFILE, &filename_len, name, &name_len);
 }
+void export_1d_elem_geometry_grpd(const char *EXELEMFILE, const char *name, const char *mesh_code)
+{
+  int filename_len = strlen(EXELEMFILE);
+  int name_len = strlen(name);
+  int mesh_code_len = strlen(mesh_code);
 
+  export_1d_elem_geometry_grpd_c(EXELEMFILE, &filename_len, name, &name_len, mesh_code, &mesh_code_len);
+}
 void export_node_field(int nj_field, const char *EXNODEFIELD, const char *name, const char *field_name)
 {
   int filename_len = strlen(EXNODEFIELD);
