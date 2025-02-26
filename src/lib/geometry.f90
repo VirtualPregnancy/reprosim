@@ -26,6 +26,7 @@ module geometry
   public element_connectivity_1d
   public evaluate_ordering
   public get_final_real
+  public update_radius_by_order
   public update_1d_elem_field
 
 contains
@@ -407,7 +408,7 @@ contains
     art_ven_elem_map = ne_map
 
     if(diagnostics_level.GE.1)then
-       do umb_outlet_counter=1,2
+       do umb_outlet_counter=1,num_outlets
           if(umbilical_outlets(umb_outlet_counter).GT.0)then
              print *,"venous umbilical outlet element number",umbilical_outlets(umb_outlet_counter)
           endif
@@ -1570,7 +1571,6 @@ end subroutine define_capillary_model
           print *, "calculated radii:"
           print *, "start radius start_rad = ",start_rad
        endif
-
        do ne=minelem_no_radius,remaining_elems
           radius=10.0_dp**(log10(s_ratio)*dble(elem_ordrs(nindex,ne)-n_max_ord)&
            +log10(start_rad))
@@ -1723,7 +1723,7 @@ end subroutine define_capillary_model
 
     use arrays,only: dp,elem_field,num_elems,num_arterial_elems, elem_ordrs,&
                  art_ven_elem_map
-    use indices,only: ne_length,ne_radius,no_sord,ne_vol 
+    use indices,only: ne_length,ne_radius,no_sord,ne_vol,ne_radius_in,ne_radius_out
     use other_consts, only: MAX_FILENAME_LEN
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
@@ -1749,6 +1749,8 @@ end subroutine define_capillary_model
        if(ne_ven.GT.0)then
           art_radius = elem_field(ne_radius,ne_art)
           elem_field(ne_radius,ne_ven) = elem_field(ne_radius,ne_art) * factor
+          elem_field(ne_radius_in,ne_ven) = elem_field(ne_radius,ne_art) * factor
+          elem_field(ne_radius_out,ne_ven) = elem_field(ne_radius,ne_art) * factor
        endif
     enddo 
 
@@ -2056,6 +2058,7 @@ end subroutine define_capillary_model
     !Calculate generations, Horsfield orders, Strahler orders
     !.....Calculate branch generations
 
+
     elem_ordrs = 0
     maxgen=1
     DO ne=1,num_elems
@@ -2282,7 +2285,79 @@ end subroutine define_capillary_model
     call enter_exit(sub_name,2)
 
   end subroutine reallocate_node_elem_arrays
+!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+subroutine update_radius_by_order(order,new_radius,update_type,control_parameter)
+    !Note that this subroutine only works for the arterial group
 
+    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
+    use arrays,only: dp,elem_field,num_elems,num_arterial_elems,elem_ordrs
+    use indices
+    use diagnostics, only: enter_exit, get_diagnostics_level
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_UPDATE_RADIUS_BY_ORDER" :: UPDATE_RADIUS_BY_ORDER
+    !!! Parameters
+    integer, intent(in) :: order
+    real(dp), intent(in) :: new_radius
+    character(len=MAX_FILENAME_LEN), intent(in) :: update_type
+    real(dp), intent(in) :: control_parameter
+
+    integer :: ne
+    integer :: n,seed(33)
+    integer :: update_counter, leave_counter
+    real(dp) :: random
+    character(len=60) :: sub_name
+    integer :: diagnostics_level
+
+    sub_name = 'update_radius_by_order'
+    call enter_exit(sub_name,1)
+    call get_diagnostics_level(diagnostics_level)
+    
+    update_counter = 0
+    leave_counter = 0
+    n=8
+    seed = 1
+    call random_seed(size=n)
+    call random_seed(put=seed)
+
+    if(update_type.eq.'all')then
+      do ne=1,num_elems
+        if((elem_ordrs(no_sord,ne).eq.order).and.(ne.le.num_arterial_elems))then
+          elem_field(ne_radius_in,ne) = new_radius
+          elem_field(ne_radius_out,ne) = new_radius
+           elem_field(ne_radius,ne) = new_radius
+        end if
+      end do
+    else if(update_type.eq.'random') then
+      do ne=1,num_elems
+        if((elem_ordrs(no_sord,ne).eq.order).and.(ne.le.num_arterial_elems))then
+          call random_number(random)
+          if(random.le.control_parameter)then
+            update_counter = update_counter + 1
+            elem_field(ne_radius_in,ne) = new_radius
+            elem_field(ne_radius_out,ne) = new_radius
+            elem_field(ne_radius,ne) = new_radius
+          else
+            leave_counter = leave_counter + 1
+          end if
+        end if
+      end do
+      print *, 'Updated radii', update_counter, leave_counter,dble(update_counter)&
+      /dble((update_counter+leave_counter))
+    else
+     print *,  'WARNING: incorrect update radii type we are updating all vessels'
+     do ne=1,num_elems
+        if((elem_ordrs(no_sord,ne).eq.order).and.(ne.le.num_arterial_elems))then
+          elem_field(ne_radius_in,ne) = new_radius
+          elem_field(ne_radius_out,ne) = new_radius
+           elem_field(ne_radius,ne) = new_radius
+        end if
+      end do
+    endif
+
+    call enter_exit(sub_name,2)
+end subroutine update_radius_by_order
 !
 !###################################################################################
 !

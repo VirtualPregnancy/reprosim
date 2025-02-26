@@ -37,6 +37,7 @@ void define_rad_from_file(const char *FIELDFILE, const char *order_system="strah
 void define_rad_from_geom(const char *ORDER_SYSTEM, double CONTROL_PARAM, const char *START_FROM, double START_RAD, const char *group_type_in="all", const char *group_option_in="dummy");
 void define_ven_rad_from_art(const char *FILENAME, double factor=2.00);
 void define_capillary_model(int define_convolutes, int define_generations, int define_parallel,const char *DEFINE_MODEL);
+void update_radius_by_order(int order, double new_radius,const char *UPDATE_TYPE, double control_parameter);
 
 %include geometry.h
 

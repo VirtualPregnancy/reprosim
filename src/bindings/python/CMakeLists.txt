@@ -89,7 +89,7 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/__init__.py" ${PYTHON_PACKAGE_INIT_FILE_DESTINATION}
   PRE_BUILD
   OUTPUT "${PYTHON_PACKAGE_INIT_FILE_DESTINATION}"
-  COMMENT  "creating __init__.py file ({event: PRE_BUILD}, {filename: __init__.py})"
+  COMMENT  "Creating __init__.py file ({event: PRE_BUILD}, {filename: __init__.py})"
 )
 add_custom_target ("generate___init__.py" DEPENDS "${PYTHON_PACKAGE_INIT_FILE_DESTINATION}")
 add_dependencies (pybindings "generate___init__.py")
@@ -104,7 +104,7 @@ add_custom_command (
     PRE_BUILD
     DEPENDS  "staged_setup.py"
     OUTPUT   "${PYTHON_SETUP_FILE_DESTINATION}"
-    COMMENT  "creating setup.py file ({event: PRE_BUILD}, {filename: setup.py})"
+    COMMENT  "Creating setup.py file ({event: PRE_BUILD}, {filename: setup.py})"
 )
 
 #add_custom_target ("generate_setup.py" DEPENDS "${PYTHON_SETUP_FILE_DESTINATION}")
@@ -116,7 +116,7 @@ endif()
 
 set(FINALISE_PYTHON_BINDINGS_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/finalise_python_package.cmake)
 
-add_custom_command(TARGET pybindings POST_BUILD
+add_custom_command(TARGET "generate___init__.py" POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:reprosim_c> ${_GENERATOR_EXPRESSION_REPROSIM_C_SONAME} ${PYTHON_PACKAGE_DIR}
   COMMAND ${CMAKE_COMMAND} ${FINALISE_PYTHON_BINDINGS_ARGUMENTS} -P ${FINALISE_PYTHON_BINDINGS_SCRIPT}
   COMMENT "Finalise preparation of reprosim Python bindings."

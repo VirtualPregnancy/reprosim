@@ -71,6 +71,7 @@ module arrays
   
 !dec$ attributes dllexport :: elem_nodes, elem_units_below, maxgen, elem_direction, num_elems, num_nodes, elems_at_node
 !dec$ attributes dllexport :: elem_ordrs, elem_field, elem_cnct, node_xyz, nodes, units, unit_field, node_field, num_units
+!dec$ attributes dllexport :: elems
 
 contains
   subroutine set_node_field_value(row, col, value)  

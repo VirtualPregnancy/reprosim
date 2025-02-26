@@ -280,7 +280,7 @@ contains
 !
 !*evaluate_ordering:* calculates generations, Horsfield orders, Strahler orders for a given tree
   subroutine evaluate_ordering_c() bind(C, name="evaluate_ordering_c")
-    use geometry, only: evaluate_ordering
+      use geometry, only: evaluate_ordering
     implicit none
 
 #if defined _WIN32 && defined __INTEL_COMPILER
@@ -290,7 +290,35 @@ contains
 #endif
 
   end subroutine evaluate_ordering_c
+!
+!###################################################################################
+!
+subroutine update_radius_by_order_c(order,new_radius,update_type,update_type_len,control_parameter)&
+        bind(C, name="update_radius_by_order_c")
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_FILENAME_LEN
+    use geometry, only: update_radius_by_order
+    use arrays, only: dp
+    implicit none
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_UPDATE_RADIUS_BY_ORDER" :: UPDATE_RADIUS_BY ORDER
+    !!! Parameters
+    integer, intent(in) :: order
+    real(dp), intent(in) :: new_radius
+    integer,intent(in) :: update_type_len
+    real(dp), intent(in) :: control_parameter
+    type(c_ptr), value, intent(in) :: update_type
+    character(len=MAX_FILENAME_LEN) :: update_type_f
 
+     call strncpy(update_type_f, update_type, update_type_len)
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_update_radius_by_order(order,new_radius,update_type_f,control_parameter)
+#else
+    call update_radius_by_order(order,new_radius,update_type_f,control_parameter)
+#endif
+
+end subroutine update_radius_by_order_c
 
 !
 !###################################################################################

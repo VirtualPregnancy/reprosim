@@ -225,7 +225,8 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
    endif
    call initialise_solution(inletbc,outletbc,(inletbc-outletbc)/total_resistance, &
               mesh_dof,prq_solution,depvar_at_node,depvar_at_elem,FIX)
-   !move initialisation to solver solution (skipping BCs).
+
+    !move initialisation to solver solution (skipping BCs).
    no=0
    do depvar=1,mesh_dof !loop over mesh dofs
       if(.NOT.FIX(depvar))then
@@ -235,8 +236,8 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
    enddo !mesh_dof
    if((vessel_type.eq."rigid").and.(rheology_type.eq."constant_visc").and.(capillary_model_type.le.1))then
      !! ----CALL SOLVER----
-     call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
-         solver_solution, RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)
+     call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, solver_solution, &
+             RHS,  500, 500,1.d-5,1.d-4, SOLVER_FLAG)
      if(SOLVER_FLAG == 0)then
          print *, 'Warning: pmgmres has reached max iterations. Solution may not be valid if this warning persists'
      elseif(SOLVER_FLAG ==2)then
@@ -258,8 +259,8 @@ viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
      if (iteration_counter.lt.15)then
        iteration_counter = iteration_counter + 1
        !! ----CALL SOLVER----
-       call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
-       solver_solution, RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)
+       call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, solver_solution, &
+              RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)
        if(SOLVER_FLAG == 0)then
          print *, 'Warning: pmgmres has reached max iterations. Solution may not be valid if this warning persists'
        elseif(SOLVER_FLAG ==2)then
@@ -1708,6 +1709,7 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
       numparallel = 1 !Number of convolute units in parallel !dummy variable of 1 but could be updated if needed
       !Actual variables
       numseries = 3 !Number of terminal villi in a row from a single mature intermediate villous
+
       numparallel_cap = num_parallel !Number of parallel capillaries in an imaged convolute (leiser)
       numconvolutes = num_convolutes!number of  terminal conduits in a single feeding vessel
       numgens = num_generations
@@ -2015,8 +2017,8 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
     nnz = nnz+1
     SparseRow(MatrixSize+1) = nnz
 
-    call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
-       Solution, RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)
+    call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, Solution, &
+           RHS, 500, 500,1.d-5,1.d-4, SOLVER_FLAG)
 
     !!!!!!!!!!!!!!!ONLY IF NOT RIGID!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !We now have pressures - which we can use to update radii and resistances and re-solve
@@ -2069,8 +2071,8 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
          endif
         enddo
        ! Solve system
-       call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
-         SolutionNew, RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)
+       call pmgmres_ilu_cr(MatrixSize, NonZeros,SparseRow, SparseCol, SparseVal, SolutionNew, &
+               RHS, 500, 500,1.d-5,1.d-4, SOLVER_FLAG)
        do i = 1,MatrixSize
          err = err + (SolutionNew(i) - Solution(i))**2.0_dp/Solution(i)**2.0_dp
        enddo

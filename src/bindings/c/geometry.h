@@ -17,6 +17,7 @@ SHO_PUBLIC void define_ven_rad_from_art(const char *FILENAME, double factor);
 SHO_PUBLIC void define_capillary_model(int define_convolutes, int define_generations, int define_parallel,const char *DEFINE_MODEL);
 SHO_PUBLIC void element_connectivity_1d();
 SHO_PUBLIC void evaluate_ordering();
+SHO_PUBLIC void update_radius_by_order(int order,double new_radius,const char *UPDATE_TYPE, double control_parameter);
 SHO_PUBLIC void update_1d_elem_field(int ne_field, int elem_number, double value);
 
 #endif /* REPROSIM_GEOMETRY_H */

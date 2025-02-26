@@ -18,6 +18,7 @@ void define_ven_rad_from_art_c(const char *FILENAME, int *filename_len, double *
 void define_capillary_model_c(int *define_convolutes, int *define_generations, int *define_parallel,const char *DEFINE_MODEL,int *define_model_len);
 void element_connectivity_1d_c();
 void evaluate_ordering_c();
+void update_radius_by_order_c(int *order,double *new_radius,const char *UPDATE_TYPE, int *update_type_len, double *control_parameter);
 void update_1d_elem_field_c(int *ne_field, int *elem_number, double *value);
 
 
@@ -91,6 +92,12 @@ void define_capillary_model(int define_convolutes, int define_generations, int d
 void element_connectivity_1d()
 {
   element_connectivity_1d_c();
+}
+
+void update_radius_by_order(int order,double new_radius,const char *UPDATE_TYPE, double control_parameter)
+{
+  int update_type_len = strlen(UPDATE_TYPE);
+  update_radius_by_order_c(&order, &new_radius, UPDATE_TYPE, &update_type_len, &control_parameter);
 }
 
 void evaluate_ordering()

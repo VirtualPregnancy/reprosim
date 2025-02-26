@@ -23,9 +23,9 @@ jobs:
             os: ubuntu-20.04,
           }
         - {
-            name: "macOS Big Sur 11",
+            name: "macOS Monterey 12",
             build_type: "Release",
-            os: macos-11,
+            os: macos-12,
           }
     steps:
 # Useful for debugging dll load issues.
@@ -213,7 +213,7 @@ jobs:
         cmake \
           -S reprosim \
           -B build-reprosim \
-          -D CMAKE_Fortran_COMPILER=gfortran-10 \
+          -D CMAKE_Fortran_COMPILER=gfortran-13 \
           -D CMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
           -D Python_EXECUTABLE=${{ steps.create-venv.outputs.python_exe }}
     - name: Build reprosim

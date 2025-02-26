@@ -41,18 +41,18 @@ module solve
 !    LC: QA188.S17.
 !
 !  Parameters:
-!    Input, integer ( kind = 4 ) N, the order of the system.
+!    Input, integer :: N, the order of the system.
 !
-!    Input, integer ( kind = 4 ) NZ_NUM, the number of nonzeros.
+!    Input, integer :: NZ_NUM, the number of nonzeros.
 !
-!    Input, integer ( kind = 4 ) IA(N+1), JA(NZ_NUM), the row and column
+!    Input, integer :: IA(N+1), JA(NZ_NUM), the row and column
 !    indices of the matrix values.  The row vector has been compressed.
 !
-!    Input, real ( kind = 8 ) A(NZ_NUM), the matrix values.
+!    Input, real(dp) :: A(NZ_NUM), the matrix values.
 !
-!    Input, real ( kind = 8 ) X(N), the vector to be multiplied by A'.
+!    Input, real(dp) :: X(N), the vector to be multiplied by A'.
 !
-!    Output, real ( kind = 8 ) W(N), the value of A'*X.
+!    Output, real(dp) :: W(N), the value of A'*X.
 !
 ! Information:
 !    The Sparse Compressed Row storage format is used.
@@ -244,70 +244,74 @@ end subroutine BICGSTAB_LinSolv
 !
 !#############################################################################
 !
-subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, tol_rel,FLAG )
+subroutine pmgmres_ilu_cr (n,nz_num,ia,ja,a, x, rhs, itr_max, mr, tol_abs, tol_rel,FLAG)
 ! PMGMRES_ILU_CR applies the preconditioned restarted GMRES algorithm.
 !    This routine uses the incomplete LU decomposition for the
 !    preconditioning.  This preconditioner requires that the sparse
 !    matrix data structure supplies a storage position for each diagonal
 !    element of the matrix A, and that each diagonal element of the
 !    matrix A is not zero.
-!    Input/output, real ( kind = 8 ) X(N); on input, an approximation to
+!    Input/output, real(dp) :: X(N); on input, an approximation to
 !    the solution.  On output, an improved approximation.
 !
-!    Input, real ( kind = 8 ) RHS(N), the right hand side of the linear system.
+!    Input, real(dp) :: RHS(N), the right hand side of the linear system.
 !
-!    Input, integer ( kind = 4 ) ITR_MAX, the maximum number of (outer)
+!    Input, integer :: ITR_MAX, the maximum number of (outer)
 !    iterations to take.
 !
-!    Input, integer ( kind = 4 ) MR, the maximum number of (inner) iterations
+!    Input, integer :: MR, the maximum number of (inner) iterations
 !    to take.  MR must be less than N.
 !
-!    Input, real ( kind = 8 ) TOL_ABS, an absolute tolerance applied to the
+!    Input, real(dp) :: TOL_ABS, an absolute tolerance applied to the
 !    current residual.
 !
-!    Input, real ( kind = 8 ) TOL_REL, a relative tolerance comparing the
+!    Input, real(dp) :: TOL_REL, a relative tolerance comparing the
 !    current residual to the initial residual.
 !
+    use arrays
     use diagnostics, only: enter_exit,get_diagnostics_level
     implicit none
 
-    integer ( kind = 4 ) mr
-    integer ( kind = 4 ) n
-    integer ( kind = 4 ) nz_num
-    integer ( kind = 4 ) ia(*) !ia(n+1)
-    integer ( kind = 4 ) ja(*) !ja(nz_num)
-    integer ( kind = 4 ) itr_max
+    integer, intent(in) :: n !n=the size of the matrix
+    !integer :: mr
+    integer, intent(in) :: nz_num !Number of non-zeros within the matrix
+    integer, intent(in) :: ia(n+1) !SparseRow
+    integer, intent(in) :: ja(nz_num) !SparseCol
+    real(dp), intent(in) :: a(nz_num) !sparseval
+    real(dp), intent(inout) :: x(n) !Solution
+    real(dp), intent(in) :: rhs(n) !rhs(n)
 
-    real ( kind = 8 ) a(*) !a(nz_num)
-    real ( kind = 8 ) x(*) !x(n)
-    real ( kind = 8 ) rhs(*) !rhs(n)
-    real ( kind = 8 ) tol_abs
-    real ( kind = 8 ) tol_rel
-    integer (kind = 4) FLAG
+    integer, intent(in) :: itr_max
+    integer, intent(in) :: mr
+    real(dp), intent(in) :: tol_abs
+    real(dp), intent(in) :: tol_rel
+    integer, intent(out) :: FLAG
 
+    !! Local variable
+    real(dp) :: av
+    real(dp), allocatable :: c(:)!(mr+1)
+    real(dp) :: delta = 1.0d-03
 
-    real ( kind = 8 ) av
-    real ( kind = 8 ) c(mr+1)
-    real ( kind = 8 ), parameter :: delta = 1.0D-03
-    real ( kind = 8 ) g(mr+1)
-    real ( kind = 8 ) h(mr+1,mr)
-    real ( kind = 8 ) htmp
-    integer ( kind = 4 ) i
-    integer ( kind = 4 ) itr
-    integer ( kind = 4 ) itr_used
-    integer ( kind = 4 ) j
-    integer ( kind = 4 ) k
-    integer ( kind = 4 ) k_copy
+    real(dp) :: htmp
+    integer :: i
+    integer :: itr
+    integer :: itr_used
+    integer :: j
+    integer :: k
+    integer :: k_copy
 
-    real ( kind = 8 ) l(ia(n+1)+1)
-    real ( kind = 8 ) mu
-    real ( kind = 8 ) r(n)
-    real ( kind = 8 ) rho
-    real ( kind = 8 ) rho_tol
-    real ( kind = 8 ) s(mr+1)
-    integer ( kind = 4 ) ua(n)
-    real ( kind = 8 ) v(n,mr+1);
-    real ( kind = 8 ) y(mr+1)
+    real(dp), allocatable :: l(:)!l(ia(n+1)+1)
+    integer :: l_size
+    real(dp) :: mu
+    real(dp), allocatable :: r(:)
+    real(dp) :: rho
+    real(dp) :: rho_tol
+    real(dp), allocatable :: s(:)! (mr+1)
+    integer :: ua(n)
+    real(dp), allocatable :: v(:,:)
+    real(dp), allocatable :: g(:)!(mr+1)
+    real(dp), allocatable :: h(:,:)!(mr+1,mr)
+    real(dp), allocatable :: y(:)!(mr+1)
 
     integer :: diagnostics_level
     character(len=60) :: sub_name
@@ -317,29 +321,48 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
 
+    !Zero the number of local iterations
     itr_used = 0
-    FLAG=0 !not converged 
+    !Solver flag
+    FLAG=0 !not converged
 
-    call rearrange_cr ( n, ia, ja, a )
+    call rearrange_cr( n, nz_num, ia, ja, a )
 
-    call diagonal_pointer_cr ( n, ia, ja, ua )
+    call diagonal_pointer_cr ( n, nz_num, ia, ja, ua )
+    !!! Allocating memory to local parameters
+    if(allocated(l)) deallocate (l)
+    l_size = ia(n+1)+1
+    allocate (l(l_size))
+    if(allocated(r)) deallocate(r)
+    allocate(r(n))
+    if(allocated(v)) deallocate(v)
+    allocate(v(n,mr+1))
+    if(allocated(g)) deallocate(g)
+    allocate(g(mr+1))
+    if(allocated(h)) deallocate(h)
+    allocate(h(mr+1,mr))
+    if(allocated(c)) deallocate(c)
+    allocate(c(mr+1))
+    if(allocated(s)) deallocate(s)
+    allocate(s(mr+1))
+    if(allocated(y)) deallocate(y)
+    allocate(y(mr+1))
 
-    call ilu_cr ( n, nz_num, ia, ja, a, ua, l )
+    call ilu_cr ( n, nz_num, l_size, ia, ja, a, ua, l)
 
     if (diagnostics_level.GT.1) then
        write ( *, '(a)' ) ' '
        write ( *, '(a)' ) 'PMGMRES_ILU_CR'
-       write ( *, '(a,i4)' ) '  Number of unknowns = ', n
+       write ( *, '(a,i8)' ) '  Number of unknowns = ', n
     end if
 
-    do itr = 1, itr_max
+    do itr = 1, itr_max !DO ITR
 
-       call ax_cr ( n, ia, ja, a, x, r )
+       call ax_cr ( n, nz_num, ia, ja, a, x, r )
 
        r(1:n) = rhs(1:n) - r(1:n)
 
-!!!! note that uses r,r in the call, but r,z in subroutine ??
-       call lus_cr ( n, ia, ja, l, ua, r, r )
+       call lus_cr ( n, nz_num, l_size, ia, ja, l, ua, r)
 
        rho = sqrt ( dot_product ( r, r ) )
 
@@ -354,17 +377,17 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
        v(1:n,1) = r(1:n) / rho
 
        g(1) = rho
-       g(2:mr+1) = 0.0D+00
+       g(2:mr+1) = 0.0_dp
 
-       h(1:mr+1,1:mr) = 0.0D+00
+       h(1:mr+1,1:mr) = 0.0_dp
 
-       do k = 1, mr
+       do k = 1, mr !DO K
 
           k_copy = k
 
-          call ax_cr ( n, ia, ja, a, v(1:n,k), v(1:n,k+1) )
+          call ax_cr ( n,nz_num, ia, ja, a, v(1:n,k), v(1:n,k+1) )
 
-          call lus_cr ( n, ia, ja, l, ua, v(1:n,k+1), v(1:n,k+1) )
+          call lus_cr ( n,nz_num, l_size, ia, ja, l, ua, v(1:n,k+1))
 
           av = sqrt ( dot_product ( v(1:n,k+1), v(1:n,k+1) ) )
 
@@ -384,7 +407,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
              h(k+1,k) = sqrt ( dot_product ( v(1:n,k+1), v(1:n,k+1) ) )
           end if
 
-          if ( h(k+1,k) /= 0.0D+00 ) then
+          if ( h(k+1,k).ne.0.0_dp ) then
              v(1:n,k+1) = v(1:n,k+1) / h(k+1,k)
           end if
 
@@ -401,7 +424,7 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
           c(k) = h(k,k) / mu
           s(k) = -h(k+1,k) / mu
           h(k,k) = c(k) * h(k,k) - s(k) * h(k+1,k)
-          h(k+1,k) = 0.0D+00
+          h(k+1,k) = 0.0_dp
           call mult_givens ( c(k), s(k), k, g )
 
           rho = abs ( g(k+1) )
@@ -420,29 +443,29 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
              exit
           end if
 
-       end do
+       end do !ENDDO K
 
-       k = k_copy - 1
+      k = k_copy - 1
 
-       y(k+1) = g(k+1) / h(k+1,k+1)
+      y(k+1) = g(k+1) / h(k+1,k+1)
 
-       do i = k, 1, -1
-          y(i) = ( g(i) - dot_product ( h(i,i+1:k+1), y(i+1:k+1) ) ) / h(i,i)
-       end do
+      do i = k, 1, -1 !DO K BACK
+         y(i) = ( g(i) - dot_product ( h(i,i+1:k+1), y(i+1:k+1) ) ) / h(i,i)
+      end do !ENDDO K BACK
 
-       do i = 1, n
-          x(i) = x(i) + dot_product ( v(i,1:k+1), y(1:k+1) )
-       end do
+      do i = 1, n !DO N
+         x(i) = x(i) + dot_product ( v(i,1:k+1), y(1:k+1) )
+      end do !ENDDO n
 
-       if ( rho <= rho_tol .and. rho <= tol_abs ) then
+      if ( rho <= rho_tol .and. rho <= tol_abs ) then
           FLAG=1
-          exit
-       elseif (isnan(rho))then
-          FLAG=2
-          exit
-       end if
+         exit
+      elseif (isnan(rho))then
+         FLAG=2
+         exit
+      end if
 
-    end do
+    end do !ENDDO ITR
     
     if (diagnostics_level.GT.1) then
        write ( *, '(a)' ) ' '
@@ -450,10 +473,17 @@ subroutine pmgmres_ilu_cr ( n, nz_num, ia, ja, a, x, rhs, itr_max, mr, tol_abs, 
        write ( *, '(a,i6)' ) '  Iterations = ', itr_used
        write ( *, '(a,g14.6)' ) '  Final residual = ', rho
     end if
-
+    !!! Deallocate local memory
+    deallocate(l)
+    deallocate(r)
+    deallocate(v)
+    deallocate(g)
+    deallocate(h)
+    deallocate(c)
+    deallocate(s)
+    deallocate(y)
     call enter_exit(sub_name,2)
 
-    return
 end subroutine pmgmres_ilu_cr
 
 
