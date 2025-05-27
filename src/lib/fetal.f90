@@ -121,7 +121,7 @@ contains
 
         write(*,*) 'Total  blood volume (ml):',total_volume/1000.
 
-        if (use_plac_model.eq..TRUE.) then
+        if (use_plac_model.eqv..TRUE.) then
             write(*,*) 'Calculating placental resistance'
             mesh_type = 'simple_tree'
             elem_field(ne_viscfact,:) = 1.0_dp !initialise viscosity factor
@@ -137,6 +137,14 @@ contains
                 end if
             end do
         end if
+        print*, ne_group
+        print*, ne_resist
+        print*, nef_K
+        print*, nef_L
+
+        call print_matrix(elem_field_fetal)
+        write(*,*) 'This is where Toby wants this subroutine to stop'
+        stop 0
 
         Write(*,*) 'Initialising flows'
         !Initialise flows
@@ -833,5 +841,17 @@ subroutine tree_resistance(art_resistance,ven_resistance)
     art_resistance = 1.0_dp/art_resistance
     call enter_exit(sub_name,2)
 end subroutine tree_resistance
+
+subroutine print_matrix(A)
+    real(dp), intent(in) :: A(:,:)  ! An assumed-shape dummy argument
+
+    integer :: i
+
+    do i = 1, size(A,2)
+      print'(F6.3,$)', A(:,i)
+      print*, ''
+    end do
+
+  end subroutine print_matrix
 
 end module fetal
