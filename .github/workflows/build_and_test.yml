@@ -18,14 +18,14 @@ jobs:
 #            os: windows-2022,
 #          }
         - {
-            name: "Ubuntu 20.04",
+            name: "Ubuntu Latest",
             build_type: "Release",
-            os: ubuntu-20.04,
+            os: ubuntu-latest,
           }
         - {
-            name: "macOS Monterey 12",
+            name: "macOS Latest",
             build_type: "Release",
-            os: macos-12,
+            os: macos-latest,
           }
     steps:
 # Useful for debugging dll load issues.
@@ -76,6 +76,11 @@ jobs:
       with:
         compiler: 'intel'
         version: '2023.2'
+    - name: Install build prerequisites – macOS
+      if: runner.os == 'macOS'
+      run: |
+        brew update
+        brew install gcc@13 swig
 #    - name: Install oneAPI HPC kit
 #      if: runner.os == 'Windows'
 #      uses: hsorby/install-intelfortran-action@main
