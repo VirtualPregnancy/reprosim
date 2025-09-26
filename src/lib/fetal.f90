@@ -38,7 +38,7 @@ module fetal
 
 contains
     subroutine fetal_model(OUTDIR,dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,RvRv,U0LV,EsysLV,EdiaLV,&
-            RvLV,U0A,V0V,V0A)
+            RvLV,U0A,V0V,V0A,use_plac_model)
         use diagnostics, only: enter_exit,get_diagnostics_level
         use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
 
@@ -75,6 +75,10 @@ contains
         real(dp) :: Aatria !Atrial activation (no units)
         real(dp) :: dpress,Pgrad,Qnod,dQ,Vnod,press
         real(dp) :: art_resistance,ven_resistance,total_volume
+
+        logical, intent(in) :: use_plac_model !Boolean variable to control whether or not an anatomic model is used for the 
+        !fetal compartment 
+
         character(len=60) :: mesh_type
         logical :: continue
         character(len=60) :: sub_name
@@ -117,20 +121,31 @@ contains
 
         write(*,*) 'Total  blood volume (ml):',total_volume/1000.
 
-        write(*,*) 'Calculating placental resistance'
-        mesh_type = 'simple_tree'
-        elem_field(ne_viscfact,:) = 1.0_dp !initialise viscosity factor
-        call calculate_resistance(0.33600e-02_dp,mesh_type)
-        call tree_resistance(art_resistance,ven_resistance)
-        write(*,*) 'Arterial resistance (Pa.s/mm3)= ', art_resistance
-        write(*,*) 'Venous resistance (Pa.s/mm3)= ', ven_resistance
-        do ne =1,num_elems_fetal
-            if (abs(elem_field_fetal(ne_group,ne)-9.0_dp).lt.loose_tol)then!Umbilical artery
-                elem_field_fetal(ne_resist,ne) = art_resistance ! Pa s /mm3
-            elseif(abs(elem_field_fetal(ne_group,ne)-10.0_dp).lt.loose_tol)then!Umbilical vein
-                elem_field_fetal(ne_resist,ne) = ven_resistance ! Pa s /mm3
-            end if
-        end do
+        if (use_plac_model.eqv..TRUE.) then
+            write(*,*) 'Calculating placental resistance'
+            mesh_type = 'simple_tree'
+            elem_field(ne_viscfact,:) = 1.0_dp !initialise viscosity factor
+            call calculate_resistance(0.33600e-02_dp,mesh_type)
+            call tree_resistance(art_resistance,ven_resistance)
+            write(*,*) 'Arterial resistance (Pa.s/mm3)= ', art_resistance
+            write(*,*) 'Venous resistance (Pa.s/mm3)= ', ven_resistance
+            do ne =1,num_elems_fetal
+                if (abs(elem_field_fetal(ne_group,ne)-9.0_dp).lt.loose_tol)then!Umbilical artery
+                    elem_field_fetal(ne_resist,ne) = art_resistance ! Pa s /mm3
+                elseif(abs(elem_field_fetal(ne_group,ne)-10.0_dp).lt.loose_tol)then!Umbilical vein
+                    elem_field_fetal(ne_resist,ne) = ven_resistance ! Pa s /mm3
+                end if
+            end do
+        end if
+        
+        ! print*, ne_group
+        ! print*, ne_resist
+        ! print*, nef_K
+        ! print*, nef_L
+
+        ! call print_matrix(elem_field_fetal)
+        ! write(*,*) 'This is where Toby wants this subroutine to stop'
+        ! stop 0
 
         Write(*,*) 'Initialising flows'
         !Initialise flows
@@ -210,7 +225,7 @@ contains
 
 
 
-        continue = .true.
+        continue = .TRUE.
         n = 0
         do while (continue)
             n = n + 1 ! increment the heart beat number
@@ -344,8 +359,8 @@ contains
                 node_field_fetal(njf_netQ,23)
             end do
             if (n.eq.num_heart_beats) then
-                continue = .false.
-            endif
+                continue = .FALSE.
+            end if
         end do !do while
         close(10)
         close(20)
@@ -827,5 +842,17 @@ subroutine tree_resistance(art_resistance,ven_resistance)
     art_resistance = 1.0_dp/art_resistance
     call enter_exit(sub_name,2)
 end subroutine tree_resistance
+
+subroutine print_matrix(A)
+    real(dp), intent(in) :: A(:,:)  ! An assumed-shape dummy argument
+
+    integer :: i
+
+    do i = 1, size(A,2)
+      print'(F6.3,$)', A(:,i)
+      print*, ''
+    end do
+
+  end subroutine print_matrix
 
 end module fetal
