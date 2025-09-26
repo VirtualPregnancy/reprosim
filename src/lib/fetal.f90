@@ -137,14 +137,15 @@ contains
                 end if
             end do
         end if
-        print*, ne_group
-        print*, ne_resist
-        print*, nef_K
-        print*, nef_L
+        
+        ! print*, ne_group
+        ! print*, ne_resist
+        ! print*, nef_K
+        ! print*, nef_L
 
-        call print_matrix(elem_field_fetal)
-        write(*,*) 'This is where Toby wants this subroutine to stop'
-        stop 0
+        ! call print_matrix(elem_field_fetal)
+        ! write(*,*) 'This is where Toby wants this subroutine to stop'
+        ! stop 0
 
         Write(*,*) 'Initialising flows'
         !Initialise flows
