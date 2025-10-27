@@ -1901,8 +1901,8 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
     enddo
     !Repeat for veins
     do ng = 1, numgens
-
-      int_radius_gen = int_rad_vin + (int_rad_vout-int_rad_vin)/dble(numgens)*(dble(ng)-1.0_dp)
+      !Veins constructed bottom up, so construct radii in opposite order to arteries
+      int_radius_gen = int_rad_vin + (int_rad_vout-int_rad_vin)/dble(numgens)*(dble(numgens + 1.0_dp - ng)-1.0_dp)
 
       if(update_mu.eq.1) then
         call viscosity_from_radius(int_radius_gen*1000.0_dp,0.45_dp,visc_factor)
@@ -1936,37 +1936,25 @@ subroutine capillary_resistance(nelem,vessel_type,rheology_type,press_in,press_o
           SparseVal(nnz) = -1.0_dp
           nnz = nnz+1
           checkgen = 1
-          curgen = ceiling((dble(p_unknowns) - dble(i2))/dble(numconvolutes))
+          curgen = ceiling((dble(p_unknowns) - dble(i2) + 1)/dble(numconvolutes))
           divider = 2.0_dp**(curgen-1)
           do j = 1,(p_unknowns - i2)
-            if(j.eq.(p_unknowns - i2))then
-              SparseCol(nnz) = p_unknowns+j
-              SparseVal(nnz) = R_seg
-              if(update_resistance)then
-                update_resist(nnz,1) = 2 !indicating this one needs to be updated and is a vein
-                update_resist(nnz,2) = numgens - ng + 1 !current generation
-                update_resist(nnz,3) = i2 !segment that this resistance is associated with
-                original_resist(nnz) = SparseVal(nnz)
-              endif
-              nnz = nnz+1
-            else
-              SparseCol(nnz) = p_unknowns + j
-              SparseVal(nnz) = R_seg/divider
-              if(update_resistance)then
-                update_resist(nnz,1) = 2 !indicating this one needs to be updated and is a vein
-                update_resist(nnz,2) = numgens - ng + 1 !current generation
-                update_resist(nnz,3) = i2 !segment that this resistance is associated with
-                original_resist(nnz) = SparseVal(nnz)
-              endif
-              nnz = nnz + 1
+            SparseCol(nnz) = p_unknowns + j
+            SparseVal(nnz) = R_seg/divider
+            if(update_resistance)then
+              update_resist(nnz,1) = 2 !indicating this one needs to be updated and is a vein
+              update_resist(nnz,2) = numgens - ng + 1 !current generation
+              update_resist(nnz,3) = i2 !segment that this resistance is associated with
+              original_resist(nnz) = SparseVal(nnz)
             endif
+            nnz = nnz + 1
             if(j.eq.checkgen*numconvolutes)then
               checkgen = checkgen + 1
               curgen = curgen - 1
               divider = 2.0_dp**(curgen-1.0_dp)
             endif
           enddo
-          curgen = ceiling((dble(p_unknowns) - dble(i2))/dble(numconvolutes))
+          curgen = ceiling((dble(p_unknowns) - dble(i2) + 1)/dble(numconvolutes))
           SparseCol(nnz) = MatrixSize
           SparseVal(nnz) = -R_seg/(2.0_dp**curgen)
           if(update_resistance)then
