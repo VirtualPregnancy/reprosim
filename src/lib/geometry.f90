@@ -831,7 +831,7 @@ end subroutine define_capillary_model
     seg_length=int_length/dble(num_convolutes) !lengh of each intermediate villous segment
     viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
     cap_unit_radius = 0.03_dp
-    cap_resistance=(8.0_dp*viscosity*cap_length)/(PI*cap_radius**4.0_dp)/dble(num_parallel) !resistance of each capillary convolute segment (6 capillaries in parallel)
+    cap_resistance=(8.0_dp*"viscosity"*cap_length)/(PI*cap_radius**4.0_dp)/dble(num_parallel) !resistance of each capillary convolute segment (6 capillaries in parallel)
 
     terminal_resistance = 0
 
