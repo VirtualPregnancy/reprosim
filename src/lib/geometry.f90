@@ -831,7 +831,7 @@ end subroutine define_capillary_model
     seg_length=int_length/dble(num_convolutes) !lengh of each intermediate villous segment
     viscosity=0.33600e-02_dp !Pa.s !viscosity: fluid viscosity
     cap_unit_radius = 0.03_dp
-    cap_resistance=(8.0_dp*viscosity*cap_length)/(PI*cap_radius**4.0_dp)/dble(num_parallel) !resistance of each capillary convolute segment (6 capillaries in parallel)
+    cap_resistance=(8.0_dp*"viscosity"*cap_length)/(PI*cap_radius**4.0_dp)/dble(num_parallel) !resistance of each capillary convolute segment (6 capillaries in parallel)
 
     terminal_resistance = 0
 
@@ -1504,7 +1504,7 @@ end subroutine define_capillary_model
           read(unit=10, fmt="(a)", iostat=ierror) ctemp1
     	  if(index(ctemp1, "value")> 0) then
                 call get_final_real(ctemp1,radius)
-                node_radius(np)=radius   
+                node_radius(np)=radius
           endif
        endif !index
        if(np.ge.radii_num_nodes) exit read_a_node
@@ -1801,7 +1801,7 @@ end subroutine define_capillary_model
     character(len=60) :: sub_name
     integer :: orphan_nodes(num_nodes)
     integer :: diagnostics_level
-
+    logical :: TTTS_anast
     sub_name = 'element_connectivity_1d'
     call enter_exit(sub_name,1)
     call get_diagnostics_level(diagnostics_level)
@@ -1810,7 +1810,7 @@ end subroutine define_capillary_model
     ! elems_at_node(node np,0)= total number of elements connected to this node
     ! elems_at_node(node np, index of each connected element starting at 1) = connected element
     elems_at_node = 0 !initialise
-
+    TTTS_anast = .TRUE.
     DO ne=1,num_elems
        DO nn=1,2
           np=elem_nodes(nn,ne)
@@ -1853,7 +1853,10 @@ end subroutine define_capillary_model
        IF(NNT == 2) THEN !1d
           np1=elem_nodes(1,ne) !first local node
           np2=elem_nodes(2,ne) !second local node
+          IF ((elems_at_node(np2,0)).EQ.3)THEN
 
+
+          END IF
           DO noelem=1,elems_at_node(np2,0) !for each element connected to node np2
              ne2=elems_at_node(np2,noelem) !get the element number connected to node np2
              IF(ne2 /= ne)THEN !if element connected to node np2 is not the current element ne
@@ -2494,7 +2497,7 @@ subroutine update_1d_elem_field(ne_field,elem_number,value)
     integer :: ibeg,iend,nsign,ntemp
     character :: sub_string*(40)
 
-    iend=len(string) !get the length of the string
+    iend=len(string) !get the length of the stringelem_ordrs
     ibeg=index(string,":")+1 !get location of integer in string, follows ":"
     sub_string = adjustl(string(ibeg:iend)) ! get the characters beyond ":"
     iend=len(sub_string) !length of the sub-string
