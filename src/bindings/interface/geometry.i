@@ -17,7 +17,7 @@
       PyErr_SetString(PyExc_ValueError, "List items must be integers");
       SWIG_fail;
     }
-    $2[i] = PyInt_AsLong(o);
+    $2[i] = PyLong_AsLong(o);
   }
 }
 
