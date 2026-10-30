@@ -138,14 +138,6 @@ contains
             end do
         end if
         
-        ! print*, ne_group
-        ! print*, ne_resist
-        ! print*, nef_K
-        ! print*, nef_L
-
-        ! call print_matrix(elem_field_fetal)
-        ! write(*,*) 'This is where Toby wants this subroutine to stop'
-        ! stop 0
 
         Write(*,*) 'Initialising flows'
         !Initialise flows
@@ -843,15 +835,7 @@ subroutine tree_resistance(art_resistance,ven_resistance)
     call enter_exit(sub_name,2)
 end subroutine tree_resistance
 
-subroutine print_matrix(A)
-    real(dp), intent(in) :: A(:,:)  ! An assumed-shape dummy argument
 
-    integer :: i
-
-    do i = 1, size(A,2)
-      print'(F6.3,$)', A(:,i)
-      print*, ''
-    end do
 
   end subroutine print_matrix
 
