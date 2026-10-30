@@ -8,7 +8,7 @@ contains
 !
 !> Perfusion fetal
   subroutine fetal_model_c(OUTDIR,filename_len,dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,RvRv,&
-          U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A) bind(C, name="fetal_model_c")
+          U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A,use_plac_model) bind(C, name="fetal_model_c")
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
     use arrays, only: dp
@@ -34,6 +34,7 @@ contains
     real(dp),  intent(in) :: U0A
     real(dp), intent(in) :: V0V
     real(dp), intent(in) :: V0A
+    logical, intent(in) :: use_plac_model
     integer,intent(in) :: filename_len
     character(len=MAX_FILENAME_LEN) :: filename_f
 
@@ -41,10 +42,10 @@ contains
 
 #if defined _WIN32 && defined __INTEL_COMPILER
     call so_fetal_model(filename_f,dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,&
-            RvRv,U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A)
+            RvRv,U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A, use_plac_model)
 #else
     call fetal_model(filename_f,dt,num_heart_beats,T_beat,T_vs,T_as,T_v_delay,U0RV,EsysRV,EdiaRV,RvRv,&
-            U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A)
+            U0LV,EsysLV,EdiaLV,RvLV,U0A,V0V,V0A, use_plac_model)
 #endif
 
   end subroutine fetal_model_c
