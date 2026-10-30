@@ -835,8 +835,4 @@ subroutine tree_resistance(art_resistance,ven_resistance)
     call enter_exit(sub_name,2)
 end subroutine tree_resistance
 
-
-
-  end subroutine print_matrix
-
 end module fetal
